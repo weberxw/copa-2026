@@ -1,0 +1,3 @@
+#!/bin/bash
+# Lança o start.command do projeto pelo handler padrão do macOS (Terminal).
+exec /usr/bin/open "/Users/weber/workspace/copa-2026/start.command"

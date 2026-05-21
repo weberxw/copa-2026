@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <title>Copa do Mundo 2026</title>
+  <style>
+    :root {
+      --bg: #f1f4fb;
+      --surface: #ffffff;
+      --surface-2: #f5f7fc;
+      --border: #d7dcec;
+      --text: #1d2748;
+      --muted: #6b75a3;
+      --accent: #3a59cf;
+      --accent-2: #16a86d;
+      --warn: #d9852b;
+      --danger: #c93151;
+      --shadow: 0 6px 20px rgba(31, 45, 96, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: radial-gradient(1200px 600px at 10% -10%, #dde6fa 0%, transparent 60%),
+                  radial-gradient(900px 500px at 110% 10%, #e6ecfb 0%, transparent 60%),
+                  var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+    }
+    header {
+      padding: 28px 24px 8px;
+      max-width: 1500px;
+      margin: 0 auto;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    header h1 { margin: 0; font-size: 26px; letter-spacing: 0.2px; }
+    header .sub { color: var(--muted); font-size: 14px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, .btn {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background .15s, border-color .15s, transform .05s;
+    }
+    button:hover { background: #eaeffb; border-color: #b8c3e3; }
+    button:active { transform: translateY(1px); }
+    button.danger { color: var(--danger); border-color: #efc4cf; }
+
+    main { max-width: 1500px; margin: 0 auto; padding: 16px 24px 48px; }
+
+    .phase-title {
+      font-size: 14px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 28px 4px 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    .groups-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 18px;
+    }
+
+    .group {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 14px 12px;
+      box-shadow: var(--shadow);
+    }
+    .group h2 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .group h2 .pill {
+      background: var(--surface-2);
+      color: var(--accent);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    table.standings, table.third-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.standings th, table.standings td,
+    table.third-table th, table.third-table td {
+      text-align: center;
+      padding: 6px 4px;
+      border-bottom: 1px dashed #e0e5f2;
+    }
+    table.standings th, table.third-table th {
+      color: var(--muted);
+      font-weight: 500;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    table.standings td.team, table.third-table td.team {
+      text-align: left;
+      font-weight: 500;
+      max-width: 160px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    table.standings td.pts, table.third-table td.pts {
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .flag {
+      display: inline-block;
+      margin-right: 6px;
+      font-size: 15px;
+      line-height: 1;
+      vertical-align: -1px;
+    }
+
+    table.standings tr.qualified td,
+    table.third-table tr.qualified td { background: #e7f3ed; }
+    table.third-table tr.cutoff td {
+      border-bottom: 2px solid var(--accent-2);
+    }
+    table.third-table .pos { color: var(--muted); font-size: 11px; width: 28px; }
+    table.third-table .grp { color: var(--muted); font-size: 11px; width: 28px; }
+
+    .matches { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .match-row { display: flex; flex-direction: column; gap: 2px; }
+    .match-time {
+      font-size: 10.5px;
+      color: var(--muted);
+      letter-spacing: 0.3px;
+      padding-left: 2px;
+    }
+    .match {
+      display: grid;
+      grid-template-columns: 1fr 40px auto 40px 1fr;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      border-radius: 8px;
+    }
+    .match .home, .match .away { color: var(--text); }
+    .match .home { text-align: right; }
+    .match .away { text-align: left; }
+    .match .team-name {
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .match input[type="number"],
+    .ko-match input[type="number"] {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 4px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      -moz-appearance: textfield;
+    }
+    .match input[type="number"] { width: 40px; }
+    .ko-match input[type="number"] { width: 38px; }
+    .match input[type="number"]::-webkit-outer-spin-button,
+    .match input[type="number"]::-webkit-inner-spin-button,
+    .ko-match input[type="number"]::-webkit-outer-spin-button,
+    .ko-match input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .match input:focus, .ko-match input:focus {
+      outline: 2px solid var(--accent);
+      border-color: var(--accent);
+    }
+    .match .vs { color: var(--muted); font-size: 11px; text-align: center; }
+
+    /* Bracket */
+    .bracket {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    .bracket-round h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.9px;
+      font-weight: 600;
+    }
+    .bracket-round .matches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 12px;
+    }
+
+    /* Final + trophy */
+    .bracket-round.final-round .matches-grid {
+      grid-template-columns: minmax(280px, 480px);
+      justify-content: center;
+    }
+    .champion {
+      margin-top: 20px;
+      padding: 26px 24px;
+      background: linear-gradient(180deg, #fff9e3, #fdedb6);
+      border: 2px solid #ecc15a;
+      border-radius: 16px;
+      text-align: center;
+      box-shadow: 0 14px 32px rgba(236, 193, 90, 0.28);
+    }
+    .champion .trophy {
+      font-size: 56px;
+      line-height: 1;
+      filter: drop-shadow(0 6px 8px rgba(180, 130, 30, 0.35));
+    }
+    .champion-label {
+      margin-top: 8px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #8a6300;
+      font-weight: 700;
+    }
+    .champion-team {
+      margin-top: 6px;
+      font-size: 26px;
+      font-weight: 700;
+      color: #4f3700;
+    }
+    .champion-team .flag {
+      font-size: 28px;
+      margin-right: 10px;
+      vertical-align: -3px;
+    }
+    .ko-match {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+    }
+    .ko-match .ko-id {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .ko-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+    }
+    .ko-row .team-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ko-row.winner .team-label { color: var(--accent-2); font-weight: 600; }
+    .ko-row.placeholder .team-label { color: var(--muted); font-style: italic; }
+    .ko-pens {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .ko-pens input[type="number"] {
+      width: 32px !important;
+      padding: 3px 2px !important;
+      font-size: 12px !important;
+    }
+    .ko-pens .vs { color: var(--muted); font-size: 11px; }
+
+    .status {
+      position: fixed;
+      right: 16px; bottom: 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+    }
+    .status.show { opacity: 1; }
+
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Copa do Mundo 2026</h1>
+      <div class="sub">Preencha os placares manualmente.</div>
+    </div>
+    <div class="toolbar">
+      <button id="export-btn">Exportar JSON</button>
+      <button id="import-btn">Importar JSON</button>
+      <input id="import-file" type="file" accept="application/json" hidden />
+      <button id="reset-btn" class="danger">Limpar tudo</button>
+    </div>
+  </header>
+
+  <main>
+    <h2 class="phase-title">Fase de Grupos</h2>
+    <div id="groups" class="groups-grid"></div>
+
+    <h2 class="phase-title">3º Colocados (8 melhores avançam)</h2>
+    <div id="third-place"></div>
+
+    <h2 class="phase-title">Mata-mata</h2>
+    <div id="bracket"></div>
+  </main>
+
+  <div id="status" class="status">Salvo</div>
+
+  <script>
+    const GROUPS = {
+      A: [
+        { name: "México", flag: "🇲🇽" },
+        { name: "África do Sul", flag: "🇿🇦" },
+        { name: "Coreia do Sul", flag: "🇰🇷" },
+        { name: "Tchéquia", flag: "🇨🇿" },
+      ],
+      B: [
+        { name: "Canadá", flag: "🇨🇦" },
+        { name: "Bósnia e Herzegovina", flag: "🇧🇦" },
+        { name: "Catar", flag: "🇶🇦" },
+        { name: "Suíça", flag: "🇨🇭" },
+      ],
+      C: [
+        { name: "Brasil", flag: "🇧🇷" },
+        { name: "Marrocos", flag: "🇲🇦" },
+        { name: "Haiti", flag: "🇭🇹" },
+        { name: "Escócia", flag: "🏴\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}" },
+      ],
+      D: [
+        { name: "Estados Unidos", flag: "🇺🇸" },
+        { name: "Paraguai", flag: "🇵🇾" },
+        { name: "Austrália", flag: "🇦🇺" },
+        { name: "Turquia", flag: "🇹🇷" },
+      ],
+      E: [
+        { name: "Alemanha", flag: "🇩🇪" },
+        { name: "Curaçao", flag: "🇨🇼" },
+        { name: "Costa do Marfim", flag: "🇨🇮" },
+        { name: "Equador", flag: "🇪🇨" },
+      ],
+      F: [
+        { name: "Holanda", flag: "🇳🇱" },
+        { name: "Japão", flag: "🇯🇵" },
+        { name: "Suécia", flag: "🇸🇪" },
+        { name: "Tunísia", flag: "🇹🇳" },
+      ],
+      G: [
+        { name: "Bélgica", flag: "🇧🇪" },
+        { name: "Egito", flag: "🇪🇬" },
+        { name: "Irã", flag: "🇮🇷" },
+        { name: "Nova Zelândia", flag: "🇳🇿" },
+      ],
+      H: [
+        { name: "Espanha", flag: "🇪🇸" },
+        { name: "Cabo Verde", flag: "🇨🇻" },
+        { name: "Arábia Saudita", flag: "🇸🇦" },
+        { name: "Uruguai", flag: "🇺🇾" },
+      ],
+      I: [
+        { name: "França", flag: "🇫🇷" },
+        { name: "Senegal", flag: "🇸🇳" },
+        { name: "Iraque", flag: "🇮🇶" },
+        { name: "Noruega", flag: "🇳🇴" },
+      ],
+      J: [
+        { name: "Argentina", flag: "🇦🇷" },
+        { name: "Argélia", flag: "🇩🇿" },
+        { name: "Áustria", flag: "🇦🇹" },
+        { name: "Jordânia", flag: "🇯🇴" },
+      ],
+      K: [
+        { name: "Portugal", flag: "🇵🇹" },
+        { name: "RD Congo", flag: "🇨🇩" },
+        { name: "Uzbequistão", flag: "🇺🇿" },
+        { name: "Colômbia", flag: "🇨🇴" },
+      ],
+      L: [
+        { name: "Inglaterra", flag: "🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}" },
+        { name: "Croácia", flag: "🇭🇷" },
+        { name: "Panamá", flag: "🇵🇦" },
+        { name: "Gana", flag: "🇬🇭" },
+      ],
+    };
+
+    const MATCH_PAIRS = [
+      [0, 1], [2, 3],
+      [0, 2], [1, 3],
+      [0, 3], [1, 2],
+    ];
+
+    // Horários oficiais (UTC) — fonte: FotMob/FIFA. Exibidos no fuso local do navegador.
+    const SCHEDULE = {
+      "A-0": "2026-06-11T19:00:00Z", "A-1": "2026-06-12T02:00:00Z",
+      "A-2": "2026-06-18T16:00:00Z", "A-3": "2026-06-19T01:00:00Z",
+      "A-4": "2026-06-25T01:00:00Z", "A-5": "2026-06-25T01:00:00Z",
+      "B-0": "2026-06-13T17:00:00Z", "B-1": "2026-06-13T22:00:00Z",
+      "B-2": "2026-06-20T16:00:00Z", "B-3": "2026-06-20T22:00:00Z",
+      "B-4": "2026-06-26T20:00:00Z", "B-5": "2026-06-26T20:00:00Z",
+      "C-0": "2026-06-13T20:00:00Z", "C-1": "2026-06-14T01:00:00Z",
+      "C-2": "2026-06-19T22:00:00Z", "C-3": "2026-06-20T01:00:00Z",
+      "C-4": "2026-06-26T01:00:00Z", "C-5": "2026-06-26T01:00:00Z",
+      "D-0": "2026-06-12T19:00:00Z", "D-1": "2026-06-12T22:00:00Z",
+      "D-2": "2026-06-19T19:00:00Z", "D-3": "2026-06-18T22:00:00Z",
+      "D-4": "2026-06-25T20:00:00Z", "D-5": "2026-06-25T20:00:00Z",
+      "E-0": "2026-06-15T19:00:00Z", "E-1": "2026-06-15T01:00:00Z",
+      "E-2": "2026-06-22T01:00:00Z", "E-3": "2026-06-22T19:00:00Z",
+      "E-4": "2026-06-28T01:00:00Z", "E-5": "2026-06-28T01:00:00Z",
+      "F-0": "2026-06-16T22:00:00Z", "F-1": "2026-06-15T22:00:00Z",
+      "F-2": "2026-06-21T19:00:00Z", "F-3": "2026-06-23T01:00:00Z",
+      "F-4": "2026-06-27T01:00:00Z", "F-5": "2026-06-27T01:00:00Z",
+      "G-0": "2026-06-17T19:00:00Z", "G-1": "2026-06-17T22:00:00Z",
+      "G-2": "2026-06-24T17:00:00Z", "G-3": "2026-06-23T22:00:00Z",
+      "G-4": "2026-06-27T20:00:00Z", "G-5": "2026-06-27T20:00:00Z",
+      "H-0": "2026-06-14T19:00:00Z", "H-1": "2026-06-14T16:00:00Z",
+      "H-2": "2026-06-21T16:00:00Z", "H-3": "2026-06-21T01:00:00Z",
+      "H-4": "2026-06-26T16:00:00Z", "H-5": "2026-06-26T16:00:00Z",
+      "I-0": "2026-06-15T16:00:00Z", "I-1": "2026-06-16T01:00:00Z",
+      "I-2": "2026-06-21T22:00:00Z", "I-3": "2026-06-22T22:00:00Z",
+      "I-4": "2026-06-27T16:00:00Z", "I-5": "2026-06-27T16:00:00Z",
+      "J-0": "2026-06-13T01:00:00Z", "J-1": "2026-06-14T22:00:00Z",
+      "J-2": "2026-06-19T16:00:00Z", "J-3": "2026-06-20T19:00:00Z",
+      "J-4": "2026-06-26T20:00:00Z", "J-5": "2026-06-26T20:00:00Z",
+      "K-0": "2026-06-16T16:00:00Z", "K-1": "2026-06-16T19:00:00Z",
+      "K-2": "2026-06-23T16:00:00Z", "K-3": "2026-06-23T19:00:00Z",
+      "K-4": "2026-06-28T20:00:00Z", "K-5": "2026-06-28T20:00:00Z",
+      "L-0": "2026-06-17T01:00:00Z", "L-1": "2026-06-18T01:00:00Z",
+      "L-2": "2026-06-25T16:00:00Z", "L-3": "2026-06-24T22:00:00Z",
+      "L-4": "2026-06-28T20:00:00Z", "L-5": "2026-06-28T20:00:00Z",
+      "ko-73": "2026-06-28T19:00:00Z",
+      "ko-74": "2026-06-29T20:30:00Z",
+      "ko-75": "2026-06-30T01:00:00Z",
+      "ko-76": "2026-06-29T17:00:00Z",
+      "ko-77": "2026-06-30T21:00:00Z",
+      "ko-78": "2026-06-30T17:00:00Z",
+      "ko-79": "2026-07-01T01:00:00Z",
+      "ko-80": "2026-07-01T16:00:00Z",
+      "ko-81": "2026-07-02T00:00:00Z",
+      "ko-82": "2026-07-01T20:00:00Z",
+      "ko-83": "2026-07-02T23:00:00Z",
+      "ko-84": "2026-07-02T19:00:00Z",
+      "ko-85": "2026-07-03T03:00:00Z",
+      "ko-86": "2026-07-03T22:00:00Z",
+      "ko-87": "2026-07-04T01:30:00Z",
+      "ko-88": "2026-07-03T18:00:00Z",
+      "ko-89": "2026-07-04T17:00:00Z",
+      "ko-90": "2026-07-04T21:00:00Z",
+      "ko-91": "2026-07-05T20:00:00Z",
+      "ko-92": "2026-07-06T00:00:00Z",
+      "ko-93": "2026-07-06T19:00:00Z",
+      "ko-94": "2026-07-07T00:00:00Z",
+      "ko-95": "2026-07-07T16:00:00Z",
+      "ko-96": "2026-07-07T20:00:00Z",
+      "ko-97": "2026-07-09T20:00:00Z",
+      "ko-98": "2026-07-10T19:00:00Z",
+      "ko-99": "2026-07-11T21:00:00Z",
+      "ko-100": "2026-07-12T01:00:00Z",
+      "ko-101": "2026-07-14T19:00:00Z",
+      "ko-102": "2026-07-15T19:00:00Z",
+      "ko-103": "2026-07-18T21:00:00Z",
+      "ko-104": "2026-07-19T19:00:00Z",
+    };
+
+    function formatMatchTime(utc) {
+      if (!utc) return "";
+      const d = new Date(utc);
+      const date = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+      const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      return `${date} • ${time}`;
+    }
+
+    // 32-avos (Round of 32). Cada slot é "1A" (1º do grupo A), "2B" (2º do grupo B),
+    // ou "3:A,B,C,D,F" (3º de um dos grupos listados).
+    const KO_R32 = [
+      { id: 73, home: "2A", away: "2B" },
+      { id: 74, home: "1E", away: "3:A,B,C,D,F" },
+      { id: 75, home: "1F", away: "2C" },
+      { id: 76, home: "1C", away: "2F" },
+      { id: 77, home: "1I", away: "3:C,D,F,G,H" },
+      { id: 78, home: "2E", away: "2I" },
+      { id: 79, home: "1A", away: "3:C,E,F,H,I" },
+      { id: 80, home: "1L", away: "3:E,H,I,J,K" },
+      { id: 81, home: "1D", away: "3:B,E,F,I,J" },
+      { id: 82, home: "1G", away: "3:A,E,H,I,J" },
+      { id: 83, home: "2K", away: "2L" },
+      { id: 84, home: "1H", away: "2J" },
+      { id: 85, home: "1B", away: "3:E,F,G,I,J" },
+      { id: 86, home: "1J", away: "2H" },
+      { id: 87, home: "1K", away: "3:D,E,I,J,L" },
+      { id: 88, home: "2D", away: "2G" },
+    ];
+
+    const KO_R16 = [
+      { id: 89, home: "W73", away: "W75" },
+      { id: 90, home: "W74", away: "W77" },
+      { id: 91, home: "W76", away: "W78" },
+      { id: 92, home: "W79", away: "W80" },
+      { id: 93, home: "W83", away: "W84" },
+      { id: 94, home: "W81", away: "W82" },
+      { id: 95, home: "W86", away: "W88" },
+      { id: 96, home: "W85", away: "W87" },
+    ];
+
+    const KO_QF = [
+      { id: 97, home: "W89", away: "W90" },
+      { id: 98, home: "W93", away: "W94" },
+      { id: 99, home: "W91", away: "W92" },
+      { id: 100, home: "W95", away: "W96" },
+    ];
+
+    const KO_SF = [
+      { id: 101, home: "W97", away: "W98" },
+      { id: 102, home: "W99", away: "W100" },
+    ];
+
+    const KO_3RD = { id: 103, home: "L101", away: "L102" };
+    const KO_FINAL = { id: 104, home: "W101", away: "W102" };
+
+    const LEGACY_LS_KEYS = ["copa-2026-resultados-v2", "copa-2026-resultados-v1"];
+
+    let state = { groups: {}, ko: {} };
+    let saveTimer = null;
+    let savingInFlight = false;
+
+    async function fetchState() {
+      const r = await fetch("/api/state", { cache: "no-store" });
+      if (!r.ok) throw new Error("falha ao carregar state.json");
+      return r.json();
+    }
+
+    async function postState(payload) {
+      const r = await fetch("/api/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error("falha ao salvar state.json");
+    }
+
+    function saveState() {
+      flashStatus("Salvando…");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(async () => {
+        if (savingInFlight) { saveState(); return; }
+        savingInFlight = true;
+        try {
+          await postState(state);
+          flashStatus("Salvo");
+        } catch (e) {
+          flashStatus("Erro ao salvar");
+        } finally {
+          savingInFlight = false;
+        }
+      }, 250);
+    }
+
+    async function migrateFromLocalStorage() {
+      const empty = Object.keys(state.groups || {}).length === 0
+                 && Object.keys(state.ko || {}).length === 0;
+      if (!empty) return false;
+      for (const k of LEGACY_LS_KEYS) {
+        const raw = localStorage.getItem(k);
+        if (!raw) continue;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && (parsed.groups || parsed.ko)) {
+            state = { groups: parsed.groups || {}, ko: parsed.ko || {} };
+          } else if (parsed && typeof parsed === "object") {
+            state = { groups: parsed, ko: {} };
+          } else {
+            continue;
+          }
+          await postState(state);
+          localStorage.removeItem(k);
+          return true;
+        } catch {}
+      }
+      return false;
+    }
+
+    function groupMatchKey(groupId, i) { return `${groupId}-${i}`; }
+    function getGroupScore(groupId, i) {
+      return state.groups[groupMatchKey(groupId, i)] || { home: "", away: "" };
+    }
+    function setGroupScore(groupId, i, home, away) {
+      const k = groupMatchKey(groupId, i);
+      if (home === "" && away === "") delete state.groups[k];
+      else state.groups[k] = { home, away };
+      saveState();
+      withFocusPreserved(() => {
+        renderStandings(groupId);
+        renderThirdPlace();
+        renderBracket();
+      });
+    }
+
+    function withFocusPreserved(fn) {
+      const a = document.activeElement;
+      let selector = null, selStart = 0, selEnd = 0;
+      if (a && a.tagName === "INPUT") {
+        if (a.dataset.ko) {
+          selector = `input[data-ko="${a.dataset.ko}"][data-side="${a.dataset.side}"]`;
+        } else if (a.dataset.group != null) {
+          selector = `input[data-group="${a.dataset.group}"][data-i="${a.dataset.i}"][data-side="${a.dataset.side}"]`;
+        }
+        try { selStart = a.selectionStart || 0; selEnd = a.selectionEnd || 0; } catch {}
+      }
+      fn();
+      if (selector) {
+        const el = document.querySelector(selector);
+        if (el) {
+          el.focus({ preventScroll: true });
+          try { el.setSelectionRange(selStart, selEnd); } catch {}
+        }
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+
+    function computeStandings(groupId) {
+      const teams = GROUPS[groupId];
+      const stats = teams.map((t) => ({
+        name: t.name, flag: t.flag, P: 0, V: 0, E: 0, D: 0, GP: 0, GC: 0, SG: 0, Pts: 0,
+      }));
+      MATCH_PAIRS.forEach((pair, i) => {
+        const s = getGroupScore(groupId, i);
+        if (s.home === "" || s.away === "") return;
+        const h = Number(s.home), a = Number(s.away);
+        if (!Number.isFinite(h) || !Number.isFinite(a)) return;
+        const [hi, ai] = pair;
+        stats[hi].P++; stats[ai].P++;
+        stats[hi].GP += h; stats[hi].GC += a;
+        stats[ai].GP += a; stats[ai].GC += h;
+        if (h > a) { stats[hi].V++; stats[ai].D++; stats[hi].Pts += 3; }
+        else if (h < a) { stats[ai].V++; stats[hi].D++; stats[ai].Pts += 3; }
+        else { stats[hi].E++; stats[ai].E++; stats[hi].Pts++; stats[ai].Pts++; }
+      });
+      stats.forEach(s => s.SG = s.GP - s.GC);
+      stats.sort((x, y) =>
+        y.Pts - x.Pts ||
+        y.SG - x.SG ||
+        y.GP - x.GP ||
+        x.name.localeCompare(y.name, "pt-BR")
+      );
+      return stats;
+    }
+
+    function isGroupComplete(groupId) {
+      return MATCH_PAIRS.every((_, i) => {
+        const s = getGroupScore(groupId, i);
+        return s.home !== "" && s.away !== "" &&
+               Number.isFinite(Number(s.home)) && Number.isFinite(Number(s.away));
+      });
+    }
+
+    function renderStandings(groupId) {
+      const tbody = document.querySelector(`#standings-${groupId} tbody`);
+      if (!tbody) return;
+      const rows = computeStandings(groupId);
+      tbody.innerHTML = rows.map((r, idx) => `
+        <tr class="${idx < 2 ? "qualified" : ""}">
+          <td class="team"><span class="flag">${r.flag}</span>${escapeHtml(r.name)}</td>
+          <td>${r.P}</td><td>${r.V}</td><td>${r.E}</td><td>${r.D}</td>
+          <td>${r.GP}</td><td>${r.GC}</td><td>${r.SG > 0 ? "+" + r.SG : r.SG}</td>
+          <td class="pts">${r.Pts}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderGroup(groupId) {
+      const teams = GROUPS[groupId];
+      const matchesHtml = MATCH_PAIRS.map((pair, i) => {
+        const [hi, ai] = pair;
+        const s = getGroupScore(groupId, i);
+        const home = teams[hi], away = teams[ai];
+        const time = formatMatchTime(SCHEDULE[`${groupId}-${i}`]);
+        return `
+          <div class="match-row">
+            ${time ? `<div class="match-time">${time}</div>` : ""}
+            <div class="match">
+              <span class="home team-name" title="${escapeHtml(home.name)}"><span class="flag">${home.flag}</span>${escapeHtml(home.name)}</span>
+              <input type="number" min="0" max="99" inputmode="numeric"
+                     data-group="${groupId}" data-i="${i}" data-side="home"
+                     value="${escapeHtml(s.home)}" />
+              <span class="vs">×</span>
+              <input type="number" min="0" max="99" inputmode="numeric"
+                     data-group="${groupId}" data-i="${i}" data-side="away"
+                     value="${escapeHtml(s.away)}" />
+              <span class="away team-name" title="${escapeHtml(away.name)}"><span class="flag">${away.flag}</span>${escapeHtml(away.name)}</span>
+            </div>
+          </div>`;
+      }).join("");
+
+      return `
+        <section class="group">
+          <h2><span class="pill">Grupo ${groupId}</span></h2>
+          <table class="standings" id="standings-${groupId}">
+            <thead>
+              <tr>
+                <th style="text-align:left">Time</th>
+                <th>P</th><th>V</th><th>E</th><th>D</th>
+                <th>GP</th><th>GC</th><th>SG</th><th>Pts</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="matches">${matchesHtml}</div>
+        </section>
+      `;
+    }
+
+    function renderGroups() {
+      const main = document.getElementById("groups");
+      main.innerHTML = Object.keys(GROUPS).map(renderGroup).join("");
+      Object.keys(GROUPS).forEach(renderStandings);
+    }
+
+    // ---------- 3º Colocados ----------
+
+    function groupHasAnyMatch(groupId) {
+      return MATCH_PAIRS.some((_, i) => {
+        const s = getGroupScore(groupId, i);
+        return s.home !== "" || s.away !== "";
+      });
+    }
+
+    function getThirdPlaceRanking() {
+      const all = [];
+      for (const g of Object.keys(GROUPS)) {
+        const standings = computeStandings(g);
+        all.push({
+          group: g,
+          played: groupHasAnyMatch(g),
+          complete: isGroupComplete(g),
+          team: standings[2],
+        });
+      }
+      all.sort((x, y) =>
+        y.team.Pts - x.team.Pts ||
+        y.team.SG - x.team.SG ||
+        y.team.GP - x.team.GP ||
+        x.group.localeCompare(y.group)
+      );
+      return all;
+    }
+
+    function renderThirdPlace() {
+      const ranking = getThirdPlaceRanking();
+      const playedCount = ranking.filter(r => r.played).length;
+      const rowsHtml = ranking.map((r, idx) => {
+        const qualified = idx < 8;
+        const isCutoff = idx === 7;
+        const tag = !r.played
+          ? '<span style="color:var(--muted); font-size:11px;"> (sem jogos)</span>'
+          : !r.complete
+          ? '<span style="color:var(--muted); font-size:11px;"> (parcial)</span>'
+          : "";
+        return `
+          <tr class="${qualified ? "qualified" : ""} ${isCutoff ? "cutoff" : ""}">
+            <td class="pos">${idx + 1}º</td>
+            <td class="grp">${r.group}</td>
+            <td class="team">
+              <span class="flag">${r.team.flag}</span>${escapeHtml(r.team.name)}${tag}
+            </td>
+            <td>${r.team.P}</td><td>${r.team.V}</td><td>${r.team.E}</td><td>${r.team.D}</td>
+            <td>${r.team.GP}</td><td>${r.team.GC}</td>
+            <td>${r.team.SG > 0 ? "+" + r.team.SG : r.team.SG}</td>
+            <td class="pts">${r.team.Pts}</td>
+          </tr>`;
+      }).join("");
+      document.getElementById("third-place").innerHTML = `
+        <table class="third-table">
+          <thead>
+            <tr>
+              <th></th><th>Grupo</th>
+              <th style="text-align:left">Time</th>
+              <th>P</th><th>V</th><th>E</th><th>D</th>
+              <th>GP</th><th>GC</th><th>SG</th><th>Pts</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      `;
+    }
+
+    // ---------- Mata-mata ----------
+
+    // Designa os 8 melhores 3º colocados aos 8 slots de 32-avos via backtracking
+    // (restrições oficiais por slot).
+    function assignThirdPlaces() {
+      const SLOT_CONSTRAINTS = {
+        74: ["A","B","C","D","F"],
+        77: ["C","D","F","G","H"],
+        79: ["C","E","F","H","I"],
+        80: ["E","H","I","J","K"],
+        81: ["B","E","F","I","J"],
+        82: ["A","E","H","I","J"],
+        85: ["E","F","G","I","J"],
+        87: ["D","E","I","J","L"],
+      };
+      const ranking = getThirdPlaceRanking();
+      const top8 = ranking.slice(0, 8).map(r => r.group);
+      const slotIds = Object.keys(SLOT_CONSTRAINTS).map(Number);
+      const assignment = {};
+      const used = new Set();
+      function backtrack(i) {
+        if (i === slotIds.length) return true;
+        const sid = slotIds[i];
+        for (const g of SLOT_CONSTRAINTS[sid]) {
+          if (!top8.includes(g) || used.has(g)) continue;
+          assignment[sid] = g;
+          used.add(g);
+          if (backtrack(i + 1)) return true;
+          used.delete(g);
+          delete assignment[sid];
+        }
+        return false;
+      }
+      return backtrack(0) ? assignment : null;
+    }
+
+    function resolveSlot(slot) {
+      // returns {name, flag} ou null
+      if (/^[12][A-L]$/.test(slot)) {
+        const pos = parseInt(slot[0]) - 1;
+        const g = slot[1];
+        const hasAny = MATCH_PAIRS.some((_, i) => {
+          const s = getGroupScore(g, i);
+          return s.home !== "" || s.away !== "";
+        });
+        if (!hasAny) return null;
+        return computeStandings(g)[pos];
+      }
+      if (slot.startsWith("3:")) {
+        const assign = thirdAssignmentCache;
+        if (!assign) return null;
+        // descobrir o matchId que tem esse slot exato
+        const m = KO_R32.find(x => x.away === slot);
+        if (!m) return null;
+        const g = assign[m.id];
+        if (!g) return null;
+        return computeStandings(g)[2];
+      }
+      if (slot.startsWith("W") || slot.startsWith("L")) {
+        const want = slot[0];
+        const id = parseInt(slot.slice(1));
+        return getKnockoutOutcome(id, want === "W" ? "winner" : "loser");
+      }
+      return null;
+    }
+
+    function allKnockoutMatches() {
+      return [...KO_R32, ...KO_R16, ...KO_QF, ...KO_SF, KO_3RD, KO_FINAL];
+    }
+    function findKnockoutMatch(id) {
+      return allKnockoutMatches().find(m => m.id === id);
+    }
+
+    function getKnockoutScore(id) {
+      return state.ko[id] || { home: "", away: "", penHome: "", penAway: "" };
+    }
+
+    function setKnockoutScore(id, patch) {
+      const cur = getKnockoutScore(id);
+      const next = { ...cur, ...patch };
+      const empty = !next.home && !next.away && !next.penHome && !next.penAway;
+      if (empty) delete state.ko[id];
+      else state.ko[id] = next;
+      saveState();
+      withFocusPreserved(() => renderBracket());
+    }
+
+    function getKnockoutOutcome(id, which) {
+      const match = findKnockoutMatch(id);
+      if (!match) return null;
+      const home = resolveSlot(match.home);
+      const away = resolveSlot(match.away);
+      if (!home || !away) return null;
+      const s = getKnockoutScore(id);
+      if (s.home === "" || s.away === "") return null;
+      const h = Number(s.home), a = Number(s.away);
+      if (!Number.isFinite(h) || !Number.isFinite(a)) return null;
+      let winner, loser;
+      if (h > a) { winner = home; loser = away; }
+      else if (a > h) { winner = away; loser = home; }
+      else {
+        const ph = Number(s.penHome), pa = Number(s.penAway);
+        if (!Number.isFinite(ph) || !Number.isFinite(pa) || ph === pa) return null;
+        if (ph > pa) { winner = home; loser = away; }
+        else { winner = away; loser = home; }
+      }
+      return which === "winner" ? winner : loser;
+    }
+
+    function slotLabel(slot) {
+      if (slot.startsWith("3:")) {
+        return `3º (${slot.slice(2).split(",").join("/")})`;
+      }
+      if (slot.startsWith("W")) return `Venc. jogo ${slot.slice(1)}`;
+      if (slot.startsWith("L")) return `Perd. jogo ${slot.slice(1)}`;
+      return slot[0] + "º Grupo " + slot[1];
+    }
+
+    let thirdAssignmentCache = null;
+
+    function renderBracket() {
+      thirdAssignmentCache = assignThirdPlaces();
+      const rounds = [
+        { title: "16-avos de final", matches: KO_R32 },
+        { title: "Oitavas de final", matches: KO_R16 },
+        { title: "Quartas de final", matches: KO_QF },
+        { title: "Semifinais", matches: KO_SF },
+        { title: "Disputa do 3º Lugar", matches: [KO_3RD] },
+        { title: "Final", matches: [KO_FINAL], isFinal: true },
+      ];
+      const champion = getKnockoutOutcome(KO_FINAL.id, "winner");
+      const championHtml = champion ? `
+        <div class="champion">
+          <div class="trophy">🏆</div>
+          <div class="champion-label">Campeão</div>
+          <div class="champion-team">
+            <span class="flag">${champion.flag}</span>${escapeHtml(champion.name)}
+          </div>
+        </div>
+      ` : "";
+      const roundsHtml = rounds.map(r => `
+        <div class="bracket-round ${r.isFinal ? "final-round" : ""}">
+          <h3>${r.title}</h3>
+          <div class="matches-grid">
+            ${r.matches.map(renderKoMatch).join("")}
+          </div>
+        </div>
+      `).join("");
+      document.getElementById("bracket").innerHTML = `
+        <div class="bracket">${roundsHtml}${championHtml}</div>
+      `;
+    }
+
+    function renderKoMatch(m) {
+      const home = resolveSlot(m.home);
+      const away = resolveSlot(m.away);
+      const s = getKnockoutScore(m.id);
+      const h = Number(s.home), a = Number(s.away);
+      const finite = Number.isFinite(h) && Number.isFinite(a);
+      const ph = Number(s.penHome), pa = Number(s.penAway);
+      const penFinite = Number.isFinite(ph) && Number.isFinite(pa) && ph !== pa;
+      const winnerSide =
+        !finite ? null :
+        h > a ? "home" :
+        a > h ? "away" :
+        penFinite ? (ph > pa ? "home" : "away") : null;
+      const tied = finite && h === a;
+
+      const homeLabel = home
+        ? `<span class="flag">${home.flag}</span>${escapeHtml(home.name)}`
+        : slotLabel(m.home);
+      const awayLabel = away
+        ? `<span class="flag">${away.flag}</span>${escapeHtml(away.name)}`
+        : slotLabel(m.away);
+
+      const labelTag = m.id === 103 ? "3º Lugar" : m.id === 104 ? "Final" : `Jogo ${m.id}`;
+      const time = formatMatchTime(SCHEDULE[`ko-${m.id}`]);
+
+      return `
+        <div class="ko-match">
+          <div class="ko-id">${labelTag}${time ? ` • <span style="text-transform:none;letter-spacing:0;">${time}</span>` : ""}</div>
+          <div class="ko-row ${winnerSide === "home" ? "winner" : ""} ${!home ? "placeholder" : ""}">
+            <span class="team-label">${homeLabel}</span>
+            <input type="number" min="0" max="99" inputmode="numeric"
+                   data-ko="${m.id}" data-side="home" value="${escapeHtml(s.home || "")}" />
+          </div>
+          <div class="ko-row ${winnerSide === "away" ? "winner" : ""} ${!away ? "placeholder" : ""}">
+            <span class="team-label">${awayLabel}</span>
+            <input type="number" min="0" max="99" inputmode="numeric"
+                   data-ko="${m.id}" data-side="away" value="${escapeHtml(s.away || "")}" />
+          </div>
+          ${tied ? `
+            <div class="ko-pens">
+              <span>Pênaltis</span>
+              <span class="flag">${home ? home.flag : ""}</span>
+              <input type="number" min="0" max="20" inputmode="numeric"
+                     data-ko="${m.id}" data-side="penHome" value="${escapeHtml(s.penHome || "")}" />
+              <span class="vs">×</span>
+              <input type="number" min="0" max="20" inputmode="numeric"
+                     data-ko="${m.id}" data-side="penAway" value="${escapeHtml(s.penAway || "")}" />
+              <span class="flag">${away ? away.flag : ""}</span>
+            </div>` : ""}
+        </div>
+      `;
+    }
+
+    function renderAll() {
+      renderGroups();
+      renderThirdPlace();
+      renderBracket();
+    }
+
+    // ---------- Events ----------
+
+    document.addEventListener("input", (ev) => {
+      const t = ev.target;
+      if (!(t instanceof HTMLInputElement) || t.type !== "number") return;
+      // Group input
+      if (t.dataset.group) {
+        const groupId = t.dataset.group;
+        const i = Number(t.dataset.i);
+        const side = t.dataset.side;
+        const sibling = document.querySelector(
+          `input[data-group="${groupId}"][data-i="${i}"][data-side="${side === "home" ? "away" : "home"}"]`
+        );
+        const home = side === "home" ? t.value : sibling.value;
+        const away = side === "away" ? t.value : sibling.value;
+        setGroupScore(groupId, i, home.trim(), away.trim());
+        return;
+      }
+      // Knockout input
+      if (t.dataset.ko) {
+        const id = Number(t.dataset.ko);
+        const side = t.dataset.side;
+        if (side === "home" || side === "away") {
+          const other = side === "home" ? "away" : "home";
+          const sibling = document.querySelector(`input[data-ko="${id}"][data-side="${other}"]`);
+          const patch = {};
+          patch[side] = t.value.trim();
+          patch[other] = (sibling?.value || "").trim();
+          setKnockoutScore(id, patch);
+        } else if (side === "penHome" || side === "penAway") {
+          const other = side === "penHome" ? "penAway" : "penHome";
+          const sibling = document.querySelector(`input[data-ko="${id}"][data-side="${other}"]`);
+          const patch = {};
+          patch[side] = t.value.trim();
+          patch[other] = (sibling?.value || "").trim();
+          setKnockoutScore(id, patch);
+        }
+        return;
+      }
+    });
+
+    document.getElementById("reset-btn").addEventListener("click", async () => {
+      if (!confirm("Apagar todos os resultados preenchidos?")) return;
+      state = { groups: {}, ko: {} };
+      try { await postState(state); flashStatus("Resetado"); }
+      catch { flashStatus("Erro ao salvar"); }
+      renderAll();
+    });
+
+    document.getElementById("export-btn").addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `copa-2026-resultados-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById("import-btn").addEventListener("click", () => {
+      document.getElementById("import-file").click();
+    });
+    document.getElementById("import-file").addEventListener("change", async (ev) => {
+      const file = ev.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("formato inválido");
+        if (parsed.groups || parsed.ko) {
+          state = { groups: parsed.groups || {}, ko: parsed.ko || {} };
+        } else {
+          state = { groups: parsed, ko: {} };
+        }
+        await postState(state);
+        renderAll();
+        flashStatus("Importado");
+      } catch (e) {
+        alert("Falha ao importar: " + e.message);
+      } finally {
+        ev.target.value = "";
+      }
+    });
+
+    function flashStatus(text) {
+      const el = document.getElementById("status");
+      el.textContent = text;
+      el.classList.add("show");
+      clearTimeout(flashStatus._t);
+      flashStatus._t = setTimeout(() => el.classList.remove("show"), 900);
+    }
+
+    (async () => {
+      try {
+        const loaded = await fetchState();
+        state = {
+          groups: (loaded && loaded.groups) || {},
+          ko: (loaded && loaded.ko) || {},
+        };
+      } catch (e) {
+        alert("Servidor não encontrado. Rode `node server.js` na pasta do projeto e acesse http://localhost:5173");
+      }
+      await migrateFromLocalStorage().catch(() => {});
+      renderAll();
+    })();
+  </script>
+</body>
+</html>

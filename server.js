@@ -28,8 +28,53 @@ function writeState(json) {
   fs.writeFileSync(STATE_FILE, json);
 }
 
+// Conexões SSE abertas. Quando o último cliente sai e nenhum reconecta
+// dentro do GRACE_MS, o processo encerra — perfeito pra "fechar a aba
+// derruba o servidor", sem matar tudo num reload momentâneo.
+const liveClients = new Set();
+const GRACE_MS = 3000;
+let shutdownTimer = null;
+
+function scheduleShutdownIfIdle() {
+  if (liveClients.size > 0) return;
+  if (shutdownTimer) return;
+  shutdownTimer = setTimeout(() => {
+    if (liveClients.size === 0) {
+      console.log("Última aba fechada. Encerrando.");
+      process.exit(0);
+    }
+  }, GRACE_MS);
+}
+
+function cancelShutdown() {
+  if (shutdownTimer) {
+    clearTimeout(shutdownTimer);
+    shutdownTimer = null;
+  }
+}
+
 const server = http.createServer((req, res) => {
   const url = req.url.split("?")[0];
+
+  if (url === "/api/heartbeat" && req.method === "GET") {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    });
+    res.write("retry: 10000\n\n");
+    liveClients.add(res);
+    cancelShutdown();
+    const ka = setInterval(() => { try { res.write(": ka\n\n"); } catch {} }, 15000);
+    const cleanup = () => {
+      clearInterval(ka);
+      liveClients.delete(res);
+      scheduleShutdownIfIdle();
+    };
+    req.on("close", cleanup);
+    req.on("error", cleanup);
+    return;
+  }
 
   if (url === "/api/state" && req.method === "GET") {
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
@@ -73,4 +118,12 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`Copa 2026 rodando em http://localhost:${PORT}`);
   console.log(`State file: ${STATE_FILE}`);
+  // Se nenhum browser conectar em 30s (start.command falhou em abrir,
+  // por exemplo), encerra sozinho em vez de virar processo zumbi.
+  setTimeout(() => {
+    if (liveClients.size === 0) {
+      console.log("Nenhum cliente conectou. Encerrando.");
+      process.exit(0);
+    }
+  }, 30000);
 });

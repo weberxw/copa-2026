@@ -326,6 +326,7 @@
       <div class="sub">Preencha os placares manualmente.</div>
     </div>
     <div class="toolbar">
+      <button id="png-btn">Exportar PNG</button>
       <button id="export-btn">Exportar JSON</button>
       <button id="import-btn">Importar JSON</button>
       <input id="import-file" type="file" accept="application/json" hidden />
@@ -828,8 +829,9 @@
 
     // ---------- Mata-mata ----------
 
-    // Designa os 8 melhores 3º colocados aos 8 slots de 32-avos via backtracking
-    // (restrições oficiais por slot).
+    // Designa os 3º colocados aos slots de 16-avos via bipartite matching
+    // (augmenting paths). Só considera grupos com pelo menos 1 jogo lançado.
+    // Slots sem atribuição mostram placeholder "3º (X/Y/...)".
     function assignThirdPlaces() {
       const SLOT_CONSTRAINTS = {
         74: ["A","B","C","D","F"],
@@ -842,24 +844,23 @@
         87: ["D","E","I","J","L"],
       };
       const ranking = getThirdPlaceRanking();
-      const top8 = ranking.slice(0, 8).map(r => r.group);
+      const candidates = ranking.filter(r => r.played).slice(0, 8).map(r => r.group);
       const slotIds = Object.keys(SLOT_CONSTRAINTS).map(Number);
-      const assignment = {};
-      const used = new Set();
-      function backtrack(i) {
-        if (i === slotIds.length) return true;
-        const sid = slotIds[i];
-        for (const g of SLOT_CONSTRAINTS[sid]) {
-          if (!top8.includes(g) || used.has(g)) continue;
-          assignment[sid] = g;
-          used.add(g);
-          if (backtrack(i + 1)) return true;
-          used.delete(g);
-          delete assignment[sid];
+      const slotOwner = {}; // sid -> group
+      const validForSlot = (g, sid) => SLOT_CONSTRAINTS[sid].includes(g);
+      function augment(g, visited) {
+        for (const sid of slotIds) {
+          if (visited.has(sid) || !validForSlot(g, sid)) continue;
+          visited.add(sid);
+          if (!(sid in slotOwner) || augment(slotOwner[sid], visited)) {
+            slotOwner[sid] = g;
+            return true;
+          }
         }
         return false;
       }
-      return backtrack(0) ? assignment : null;
+      for (const g of candidates) augment(g, new Set());
+      return slotOwner;
     }
 
     function resolveSlot(slot) {
@@ -1097,6 +1098,99 @@
       URL.revokeObjectURL(url);
     });
 
+    function loadHtml2Canvas() {
+      if (window.html2canvas) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("falha ao baixar html2canvas (precisa de internet na 1ª vez)"));
+        document.head.appendChild(s);
+      });
+    }
+
+    // html2canvas não renderiza o `value` de <input>. Trocamos temporariamente
+    // por <span> com a mesma largura/estilo durante a captura.
+    function inputsToSpans(root) {
+      const restores = [];
+      root.querySelectorAll("input[type='number'], input[type='text']").forEach((inp) => {
+        const cs = getComputedStyle(inp);
+        const span = document.createElement("span");
+        span.textContent = inp.value || "";
+        span.style.display = "inline-flex";
+        span.style.alignItems = "center";
+        span.style.justifyContent = cs.textAlign === "left" ? "flex-start" : (cs.textAlign === "right" ? "flex-end" : "center");
+        span.style.width = cs.width;
+        span.style.height = cs.height;
+        span.style.padding = cs.padding;
+        span.style.border = cs.border;
+        span.style.borderRadius = cs.borderRadius;
+        span.style.background = cs.backgroundColor;
+        span.style.color = cs.color;
+        span.style.font = cs.font;
+        span.style.boxSizing = cs.boxSizing;
+        span.style.verticalAlign = "middle";
+        inp.parentNode.insertBefore(span, inp);
+        inp.style.display = "none";
+        restores.push(() => { inp.style.display = ""; span.remove(); });
+      });
+      return () => restores.forEach((fn) => fn());
+    }
+
+    document.getElementById("png-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("png-btn");
+      const original = btn.textContent;
+      btn.textContent = "Gerando…";
+      btn.disabled = true;
+
+      const toolbar = document.querySelector(".toolbar");
+      const status = document.getElementById("status");
+      const prevToolbar = toolbar.style.visibility;
+      const prevStatus = status.style.visibility;
+      toolbar.style.visibility = "hidden";
+      status.style.visibility = "hidden";
+
+      // Neutraliza o gradiente decorativo do body/html durante a captura
+      // (caso contrário, na altura total da página, o gradiente do topo
+      // contrasta com a cor base sólida e gera uma faixa "mais escura").
+      const FLAT_BG = "#ffffff";
+      const prevBodyBg = document.body.style.background;
+      const prevHtmlBg = document.documentElement.style.background;
+      document.body.style.background = FLAT_BG;
+      document.documentElement.style.background = FLAT_BG;
+
+      const restoreInputs = inputsToSpans(document.body);
+      const prevScrollY = window.scrollY;
+      window.scrollTo(0, 0);
+
+      try {
+        await loadHtml2Canvas();
+        const canvas = await window.html2canvas(document.body, {
+          backgroundColor: FLAT_BG,
+          scale: 2,
+          useCORS: true,
+          windowWidth: document.documentElement.scrollWidth,
+          windowHeight: document.documentElement.scrollHeight,
+        });
+        const dataUrl = canvas.toDataURL("image/png");
+        const a = document.createElement("a");
+        a.href = dataUrl;
+        a.download = `copa-2026-${new Date().toISOString().slice(0,10)}.png`;
+        a.click();
+      } catch (e) {
+        alert("Falha ao gerar PNG: " + e.message);
+      } finally {
+        restoreInputs();
+        document.body.style.background = prevBodyBg;
+        document.documentElement.style.background = prevHtmlBg;
+        toolbar.style.visibility = prevToolbar;
+        status.style.visibility = prevStatus;
+        window.scrollTo(0, prevScrollY);
+        btn.textContent = original;
+        btn.disabled = false;
+      }
+    });
+
     document.getElementById("import-btn").addEventListener("click", () => {
       document.getElementById("import-file").click();
     });
@@ -1129,6 +1223,10 @@
       clearTimeout(flashStatus._t);
       flashStatus._t = setTimeout(() => el.classList.remove("show"), 900);
     }
+
+    // Heartbeat: enquanto essa aba estiver aberta a conexão SSE fica viva.
+    // Quando fechar, o server detecta o close e encerra o processo do node.
+    try { new EventSource("/api/heartbeat"); } catch {}
 
     (async () => {
       try {

@@ -46,6 +46,25 @@ function checkAuth(req) {
   return safeEqual(header, expected);
 }
 
+function readLocalState() {
+  try {
+    return fs.readFileSync(STATE_FILE, "utf8");
+  } catch {
+    return EMPTY_STATE;
+  }
+}
+
+function hasResults(jsonStr) {
+  try {
+    const o = JSON.parse(jsonStr);
+    const g = o && o.groups ? Object.keys(o.groups).length : 0;
+    const k = o && o.ko ? Object.keys(o.ko).length : 0;
+    return g + k > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function readState() {
   if (USE_REDIS) {
     const r = await fetch(`${REDIS_URL}/get/${STATE_KEY}`, {
@@ -53,13 +72,22 @@ async function readState() {
     });
     if (!r.ok) throw new Error(`redis get ${r.status}`);
     const data = await r.json();
-    return data.result == null ? EMPTY_STATE : data.result;
-  }
-  try {
-    return fs.readFileSync(STATE_FILE, "utf8");
-  } catch {
+    if (data.result != null) return data.result;
+    // Redis vazio: semeia uma única vez a partir do state.json versionado,
+    // pra não perder os resultados já preenchidos ao migrar pro deploy.
+    const seed = readLocalState();
+    if (hasResults(seed)) {
+      try {
+        await writeState(seed);
+        console.log("Redis vazio — semeado a partir do state.json.");
+      } catch (e) {
+        console.error("Falha ao semear o Redis:", e.message);
+      }
+      return seed;
+    }
     return EMPTY_STATE;
   }
+  return readLocalState();
 }
 
 async function writeState(json) {

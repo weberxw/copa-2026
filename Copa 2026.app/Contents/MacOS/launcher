@@ -1,3 +1,7 @@
 #!/bin/bash
 # Lança o start.command do projeto pelo handler padrão do macOS (Terminal).
-exec /usr/bin/open "/Users/weber/workspace/copa-2026/start.command"
+# Resolve o caminho relativo ao próprio .app (que fica dentro da pasta do projeto),
+# então não quebra se a pasta for movida/renomeada.
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$HERE/../../.." && pwd)"
+exec /usr/bin/open "$PROJECT_DIR/start.command"

@@ -109,13 +109,6 @@ async function writeState(json) {
 const server = http.createServer((req, res) => {
   const url = req.url.split("?")[0];
 
-  // Health check público (sem auth) — usado pelo keep-alive e por monitores.
-  if (url === "/healthz") {
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-    res.end("ok");
-    return;
-  }
-
   if (!checkAuth(req)) {
     res.writeHead(401, {
       "WWW-Authenticate": 'Basic realm="Copa 2026", charset="UTF-8"',
@@ -185,15 +178,3 @@ server.listen(PORT, () => {
   console.log(`Persistência: ${USE_REDIS ? "Upstash Redis" : `arquivo local (${STATE_FILE})`}`);
   console.log(`Basic Auth: ${USE_AUTH ? "ativada" : "desativada"}`);
 });
-
-// Keep-alive: o plano free do Render dorme após ~15 min sem tráfego. Um auto-ping
-// a cada 10 min em /healthz mantém o serviço acordado, mesmo sem ninguém na página.
-// Só liga no Render (RENDER_EXTERNAL_URL = URL pública do serviço).
-const SELF_URL = process.env.RENDER_EXTERNAL_URL;
-if (SELF_URL) {
-  const KEEPALIVE_MS = 10 * 60 * 1000;
-  setInterval(() => {
-    fetch(`${SELF_URL}/healthz`).catch((e) => console.error("keep-alive falhou:", e.message));
-  }, KEEPALIVE_MS);
-  console.log(`Keep-alive: auto-ping a cada 10 min em ${SELF_URL}/healthz`);
-}

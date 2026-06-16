@@ -460,6 +460,7 @@
     </div>
     <div class="toolbar">
       <span id="user-chip" class="user-chip" hidden></span>
+      <button id="logout-btn" hidden>Trocar usuário</button>
       <button id="png-btn">Exportar PNG</button>
       <button id="reset-btn" class="danger">Limpar tudo</button>
     </div>
@@ -702,11 +703,25 @@
     }
 
     function setCurrentUser(user) {
-      const el = document.getElementById("user-chip");
-      if (!el) return;
-      if (!user || user === "default") { el.hidden = true; return; }
-      el.textContent = `Logado como ${user}`;
-      el.hidden = false;
+      const chip = document.getElementById("user-chip");
+      const out = document.getElementById("logout-btn");
+      const real = !!user && user !== "default";
+      if (chip) {
+        chip.hidden = !real;
+        if (real) chip.textContent = `Logado como ${user}`;
+      }
+      if (out) out.hidden = !real;
+    }
+
+    // Basic Auth não tem logout nativo: sobrescreve as credenciais salvas no
+    // navegador com algo inválido e recarrega, pra ele pedir login de novo.
+    function logout() {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", "/api/state?logout=" + Date.now(), false, "logout", "x" + Date.now());
+        xhr.send();
+      } catch (e) {}
+      location.reload();
     }
 
     async function postState(payload) {
@@ -1379,6 +1394,11 @@
       try { await postState(state); flashStatus("Resetado"); }
       catch { flashStatus("Erro ao salvar"); }
       renderAll();
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", () => {
+      if (!confirm("Sair e entrar com outro usuário?")) return;
+      logout();
     });
 
     function loadHtml2Canvas() {

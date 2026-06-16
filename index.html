@@ -451,9 +451,6 @@
     </div>
     <div class="toolbar">
       <button id="png-btn">Exportar PNG</button>
-      <button id="export-btn">Exportar JSON</button>
-      <button id="import-btn">Importar JSON</button>
-      <input id="import-file" type="file" accept="application/json" hidden />
       <button id="reset-btn" class="danger">Limpar tudo</button>
     </div>
   </header>
@@ -683,8 +680,6 @@
     const KO_3RD = { id: 103, home: "L101", away: "L102" };
     const KO_FINAL = { id: 104, home: "W101", away: "W102" };
 
-    const LEGACY_LS_KEYS = ["copa-2026-resultados-v2", "copa-2026-resultados-v1"];
-
     let state = { groups: {}, ko: {} };
     let saveTimer = null;
     let savingInFlight = false;
@@ -719,30 +714,6 @@
           savingInFlight = false;
         }
       }, 250);
-    }
-
-    async function migrateFromLocalStorage() {
-      const empty = Object.keys(state.groups || {}).length === 0
-                 && Object.keys(state.ko || {}).length === 0;
-      if (!empty) return false;
-      for (const k of LEGACY_LS_KEYS) {
-        const raw = localStorage.getItem(k);
-        if (!raw) continue;
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed && (parsed.groups || parsed.ko)) {
-            state = { groups: parsed.groups || {}, ko: parsed.ko || {} };
-          } else if (parsed && typeof parsed === "object") {
-            state = { groups: parsed, ko: {} };
-          } else {
-            continue;
-          }
-          await postState(state);
-          localStorage.removeItem(k);
-          return true;
-        } catch {}
-      }
-      return false;
     }
 
     function groupMatchKey(groupId, i) { return `${groupId}-${i}`; }
@@ -1391,16 +1362,6 @@
       renderAll();
     });
 
-    document.getElementById("export-btn").addEventListener("click", () => {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `copa-2026-resultados-${new Date().toISOString().slice(0,10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
     function loadHtml2Canvas() {
       if (window.html2canvas) return Promise.resolve();
       return new Promise((resolve, reject) => {
@@ -1494,31 +1455,6 @@
       }
     });
 
-    document.getElementById("import-btn").addEventListener("click", () => {
-      document.getElementById("import-file").click();
-    });
-    document.getElementById("import-file").addEventListener("change", async (ev) => {
-      const file = ev.target.files[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const parsed = JSON.parse(text);
-        if (typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("formato inválido");
-        if (parsed.groups || parsed.ko) {
-          state = { groups: parsed.groups || {}, ko: parsed.ko || {} };
-        } else {
-          state = { groups: parsed, ko: {} };
-        }
-        await postState(state);
-        renderAll();
-        flashStatus("Importado");
-      } catch (e) {
-        alert("Falha ao importar: " + e.message);
-      } finally {
-        ev.target.value = "";
-      }
-    });
-
     function flashStatus(text) {
       const el = document.getElementById("status");
       el.textContent = text;
@@ -1526,10 +1462,6 @@
       clearTimeout(flashStatus._t);
       flashStatus._t = setTimeout(() => el.classList.remove("show"), 900);
     }
-
-    // Heartbeat: enquanto essa aba estiver aberta a conexão SSE fica viva.
-    // Quando fechar, o server detecta o close e encerra o processo do node.
-    try { new EventSource("/api/heartbeat"); } catch {}
 
     (async () => {
       try {
@@ -1539,9 +1471,8 @@
           ko: (loaded && loaded.ko) || {},
         };
       } catch (e) {
-        alert("Servidor não encontrado. Rode `node server.js` na pasta do projeto e acesse http://localhost:5173");
+        alert("Não foi possível carregar os dados do servidor. Tente recarregar a página.");
       }
-      await migrateFromLocalStorage().catch(() => {});
       renderAll();
     })();
   </script>

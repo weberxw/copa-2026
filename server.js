@@ -26,10 +26,6 @@ const AUTH_USER = process.env.BASIC_AUTH_USER || "";
 const AUTH_PASS = process.env.BASIC_AUTH_PASS || "";
 const USE_AUTH = !!(AUTH_USER && AUTH_PASS);
 
-// Auto-finalização ao ficar ocioso: só local. No Render (env RENDER) fica off,
-// senão o serviço reiniciaria em loop.
-const AUTO_SHUTDOWN = !process.env.RENDER;
-
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
@@ -110,32 +106,6 @@ async function writeState(json) {
   fs.writeFileSync(STATE_FILE, json);
 }
 
-// Conexões SSE abertas. Quando o último cliente sai e nenhum reconecta
-// dentro do GRACE_MS, o processo encerra — perfeito pra "fechar a aba
-// derruba o servidor", sem matar tudo num reload momentâneo.
-const liveClients = new Set();
-const GRACE_MS = 3000;
-let shutdownTimer = null;
-
-function scheduleShutdownIfIdle() {
-  if (!AUTO_SHUTDOWN) return;
-  if (liveClients.size > 0) return;
-  if (shutdownTimer) return;
-  shutdownTimer = setTimeout(() => {
-    if (liveClients.size === 0) {
-      console.log("Última aba fechada. Encerrando.");
-      process.exit(0);
-    }
-  }, GRACE_MS);
-}
-
-function cancelShutdown() {
-  if (shutdownTimer) {
-    clearTimeout(shutdownTimer);
-    shutdownTimer = null;
-  }
-}
-
 const server = http.createServer((req, res) => {
   const url = req.url.split("?")[0];
 
@@ -145,26 +115,6 @@ const server = http.createServer((req, res) => {
       "Content-Type": "text/plain; charset=utf-8",
     });
     res.end("Autenticação necessária.");
-    return;
-  }
-
-  if (url === "/api/heartbeat" && req.method === "GET") {
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
-    });
-    res.write("retry: 10000\n\n");
-    liveClients.add(res);
-    cancelShutdown();
-    const ka = setInterval(() => { try { res.write(": ka\n\n"); } catch {} }, 15000);
-    const cleanup = () => {
-      clearInterval(ka);
-      liveClients.delete(res);
-      scheduleShutdownIfIdle();
-    };
-    req.on("close", cleanup);
-    req.on("error", cleanup);
     return;
   }
 
@@ -227,15 +177,4 @@ server.listen(PORT, () => {
   console.log(`Copa 2026 rodando na porta ${PORT}`);
   console.log(`Persistência: ${USE_REDIS ? "Upstash Redis" : `arquivo local (${STATE_FILE})`}`);
   console.log(`Basic Auth: ${USE_AUTH ? "ativada" : "desativada"}`);
-  // Local: se nenhum browser conectar em 30s (start.command falhou em abrir,
-  // por exemplo), encerra sozinho em vez de virar processo zumbi. No Render
-  // (AUTO_SHUTDOWN=false) isso fica off, senão o serviço reiniciaria em loop.
-  if (AUTO_SHUTDOWN) {
-    setTimeout(() => {
-      if (liveClients.size === 0) {
-        console.log("Nenhum cliente conectou. Encerrando.");
-        process.exit(0);
-      }
-    }, 30000);
-  }
 });

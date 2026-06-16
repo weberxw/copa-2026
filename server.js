@@ -21,10 +21,31 @@ const REDIS_TOKEN = cleanEnv(process.env.UPSTASH_REDIS_REST_TOKEN);
 const USE_REDIS = !!(REDIS_URL && REDIS_TOKEN);
 const STATE_KEY = "copa2026-state";
 
-// Basic Auth: ativada só quando as duas env vars existem.
-const AUTH_USER = process.env.BASIC_AUTH_USER || "";
-const AUTH_PASS = process.env.BASIC_AUTH_PASS || "";
-const USE_AUTH = !!(AUTH_USER && AUTH_PASS);
+// Usuários para Basic Auth, em dois formatos combinados:
+//  - legado: BASIC_AUTH_USER + BASIC_AUTH_PASS (1 usuário)
+//  - lista:  BASIC_AUTH_USERS="user1:senha1,user2:senha2"
+// Cada usuário tem sua própria tabela de resultados no Redis. O 1º da lista é o
+// "primário" e herda os dados do modo single-user (chave legada copa2026-state).
+function parseUsers() {
+  const list = [];
+  const seen = new Set();
+  const add = (user, pass) => {
+    user = (user || "").trim();
+    if (!user || !pass || seen.has(user)) return;
+    seen.add(user);
+    list.push({ user, pass });
+  };
+  add(cleanEnv(process.env.BASIC_AUTH_USER), process.env.BASIC_AUTH_PASS || "");
+  for (const pair of cleanEnv(process.env.BASIC_AUTH_USERS).split(",")) {
+    const i = pair.indexOf(":");
+    if (i < 0) continue;
+    add(pair.slice(0, i), pair.slice(i + 1).trim());
+  }
+  return list;
+}
+const USERS = parseUsers();
+const USE_AUTH = USERS.length > 0;
+const PRIMARY_USER = USERS.length ? USERS[0].user : "";
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -42,11 +63,25 @@ function safeEqual(a, b) {
   return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
 }
 
-function checkAuth(req) {
-  if (!USE_AUTH) return true;
+// Retorna o nome do usuário autenticado, ou null. Cada usuário tem sua tabela.
+function authUser(req) {
+  if (!USE_AUTH) return null;
   const header = req.headers["authorization"] || "";
-  const expected = "Basic " + Buffer.from(`${AUTH_USER}:${AUTH_PASS}`).toString("base64");
-  return safeEqual(header, expected);
+  if (!header.startsWith("Basic ")) return null;
+  let decoded;
+  try {
+    decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+  } catch {
+    return null;
+  }
+  const i = decoded.indexOf(":");
+  if (i < 0) return null;
+  const user = decoded.slice(0, i);
+  const pass = decoded.slice(i + 1);
+  for (const u of USERS) {
+    if (safeEqual(user, u.user) && safeEqual(pass, u.pass)) return u.user;
+  }
+  return null;
 }
 
 function readLocalState() {
@@ -68,48 +103,66 @@ function hasResults(jsonStr) {
   }
 }
 
-async function readState() {
-  if (USE_REDIS) {
-    const r = await fetch(`${REDIS_URL}/get/${STATE_KEY}`, {
-      headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
-    });
-    if (!r.ok) throw new Error(`redis get ${r.status}`);
-    const data = await r.json();
-    if (data.result != null) return data.result;
-    // Redis vazio: semeia uma única vez a partir do state.json versionado,
-    // pra não perder os resultados já preenchidos ao migrar pro deploy.
-    const seed = readLocalState();
-    if (hasResults(seed)) {
-      try {
-        await writeState(seed);
-        console.log("Redis vazio — semeado a partir do state.json.");
-      } catch (e) {
-        console.error("Falha ao semear o Redis:", e.message);
-      }
-      return seed;
-    }
-    return EMPTY_STATE;
-  }
-  return readLocalState();
+async function redisGet(key) {
+  const r = await fetch(`${REDIS_URL}/get/${key}`, {
+    headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+  });
+  if (!r.ok) throw new Error(`redis get ${r.status}`);
+  const data = await r.json();
+  return data.result; // string ou null
 }
 
-async function writeState(json) {
-  if (USE_REDIS) {
-    const r = await fetch(`${REDIS_URL}/set/${STATE_KEY}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
-      body: json,
-    });
-    if (!r.ok) throw new Error(`redis set ${r.status}`);
+async function redisSet(key, value) {
+  const r = await fetch(`${REDIS_URL}/set/${key}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+    body: value,
+  });
+  if (!r.ok) throw new Error(`redis set ${r.status}`);
+}
+
+// Chave por usuário: cada um tem sua própria tabela de resultados.
+function userKey(user) {
+  return `${STATE_KEY}:${String(user).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
+async function readState(user) {
+  if (!USE_REDIS) return readLocalState();
+  const key = userKey(user);
+  const cur = await redisGet(key);
+  if (cur != null) return cur;
+  // Tabela do usuário ainda não existe. Só o usuário primário herda os dados
+  // antigos do modo single-user: primeiro a chave legada, depois o state.json.
+  if (user === PRIMARY_USER) {
+    const legacy = await redisGet(STATE_KEY);
+    if (legacy != null && hasResults(legacy)) {
+      await redisSet(key, legacy);
+      console.log(`Migrado ${STATE_KEY} -> ${key}`);
+      return legacy;
+    }
+    const seed = readLocalState();
+    if (hasResults(seed)) {
+      await redisSet(key, seed);
+      console.log(`Semeado ${key} a partir do state.json.`);
+      return seed;
+    }
+  }
+  return EMPTY_STATE;
+}
+
+async function writeState(user, json) {
+  if (!USE_REDIS) {
+    fs.writeFileSync(STATE_FILE, json);
     return;
   }
-  fs.writeFileSync(STATE_FILE, json);
+  await redisSet(userKey(user), json);
 }
 
 const server = http.createServer((req, res) => {
   const url = req.url.split("?")[0];
 
-  if (!checkAuth(req)) {
+  const user = authUser(req);
+  if (USE_AUTH && !user) {
     res.writeHead(401, {
       "WWW-Authenticate": 'Basic realm="Copa 2026", charset="UTF-8"',
       "Content-Type": "text/plain; charset=utf-8",
@@ -117,9 +170,10 @@ const server = http.createServer((req, res) => {
     res.end("Autenticação necessária.");
     return;
   }
+  const stateUser = user || "default";
 
   if (url === "/api/state" && req.method === "GET") {
-    readState()
+    readState(stateUser)
       .then((bodyOut) => {
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
         res.end(bodyOut);
@@ -148,7 +202,7 @@ const server = http.createServer((req, res) => {
         return;
       }
       try {
-        await writeState(JSON.stringify(parsed, null, 2));
+        await writeState(stateUser, JSON.stringify(parsed, null, 2));
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end('{"ok":true}');
       } catch (e) {
@@ -176,5 +230,5 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`Copa 2026 rodando na porta ${PORT}`);
   console.log(`Persistência: ${USE_REDIS ? "Upstash Redis" : `arquivo local (${STATE_FILE})`}`);
-  console.log(`Basic Auth: ${USE_AUTH ? "ativada" : "desativada"}`);
+  console.log(`Basic Auth: ${USE_AUTH ? `${USERS.length} usuário(s) [${USERS.map((u) => u.user).join(", ")}]` : "desativada"}`);
 });

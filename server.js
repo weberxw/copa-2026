@@ -8,9 +8,16 @@ const ROOT = __dirname;
 const STATE_FILE = path.join(ROOT, "state.json");
 const EMPTY_STATE = JSON.stringify({ groups: {}, ko: {} });
 
+// Limpa aspas/espaços acidentais nos env vars. O painel REST do Upstash mostra
+// os valores em formato .env com aspas (UPSTASH_..._URL="https://..."), então é
+// comum colá-las junto — o que quebraria a URL/token.
+function cleanEnv(v) {
+  return (v || "").trim().replace(/^["']|["']$/g, "").trim();
+}
+
 // Persistência: Upstash Redis (REST) se configurado; senão arquivo local.
-const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
-const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const REDIS_URL = cleanEnv(process.env.UPSTASH_REDIS_REST_URL).replace(/\/+$/, "");
+const REDIS_TOKEN = cleanEnv(process.env.UPSTASH_REDIS_REST_TOKEN);
 const USE_REDIS = !!(REDIS_URL && REDIS_TOKEN);
 const STATE_KEY = "copa2026-state";
 

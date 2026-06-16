@@ -69,6 +69,130 @@
       padding-bottom: 6px;
     }
 
+    /* ---------- Jogos do dia ---------- */
+    .tc-daynav {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 4px 12px;
+    }
+    .tc-daylabel {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: capitalize;
+      margin-left: 4px;
+    }
+    .tc-arrow {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color .15s, background .15s;
+    }
+    .tc-arrow:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-2); }
+    .tc-arrow:disabled { opacity: .35; cursor: default; }
+    .tc-today {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      transition: border-color .15s, background .15s;
+    }
+    .tc-today:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-2); }
+    .tc-today:disabled { opacity: .35; cursor: default; }
+    .today-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .today-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color .15s, transform .15s, box-shadow .15s;
+    }
+    .today-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 10px rgba(58, 89, 207, .12);
+    }
+    .today-card:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Destaque ao chegar na partida clicada */
+    .jump-flash { animation: jumpFlash 2.6s ease-out; }
+    @keyframes jumpFlash {
+      0%, 25% { outline: 2px solid var(--accent); outline-offset: 3px; }
+      100% { outline: 2px solid rgba(58, 89, 207, 0); outline-offset: 3px; }
+    }
+    .today-card .tc-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .today-card .pill {
+      background: var(--surface-2);
+      color: var(--accent);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+    .today-card .tc-time {
+      color: var(--muted);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+    .today-card .tc-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 15px;
+      color: var(--text);
+    }
+    .today-card .tc-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .today-card .tc-tbd { color: var(--muted); font-size: 13px; }
+    .today-card .tc-score {
+      margin-left: auto;
+      padding-left: 8px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .today-card .tc-pen { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 3px; }
+    .today-card .tc-row.tc-win .tc-name { font-weight: 700; }
+    .tc-empty { color: var(--muted); font-size: 14px; padding: 4px; }
+
     .groups-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
@@ -335,6 +459,9 @@
   </header>
 
   <main>
+    <h2 class="phase-title">Jogos do dia</h2>
+    <div id="today-matches"></div>
+
     <h2 class="phase-title">Fase de Grupos</h2>
     <div id="groups" class="groups-grid"></div>
 
@@ -432,41 +559,41 @@
     // Horários oficiais (UTC) — fonte: FotMob/FIFA. Exibidos no fuso local do navegador.
     const SCHEDULE = {
       "A-0": "2026-06-11T19:00:00Z", "A-1": "2026-06-12T02:00:00Z",
-      "A-2": "2026-06-18T16:00:00Z", "A-3": "2026-06-19T01:00:00Z",
+      "A-2": "2026-06-19T01:00:00Z", "A-3": "2026-06-18T16:00:00Z",
       "A-4": "2026-06-25T01:00:00Z", "A-5": "2026-06-25T01:00:00Z",
-      "B-0": "2026-06-13T17:00:00Z", "B-1": "2026-06-13T22:00:00Z",
-      "B-2": "2026-06-20T16:00:00Z", "B-3": "2026-06-20T22:00:00Z",
-      "B-4": "2026-06-26T20:00:00Z", "B-5": "2026-06-26T20:00:00Z",
-      "C-0": "2026-06-13T20:00:00Z", "C-1": "2026-06-14T01:00:00Z",
-      "C-2": "2026-06-19T22:00:00Z", "C-3": "2026-06-20T01:00:00Z",
-      "C-4": "2026-06-26T01:00:00Z", "C-5": "2026-06-26T01:00:00Z",
-      "D-0": "2026-06-12T19:00:00Z", "D-1": "2026-06-12T22:00:00Z",
-      "D-2": "2026-06-19T19:00:00Z", "D-3": "2026-06-18T22:00:00Z",
-      "D-4": "2026-06-25T20:00:00Z", "D-5": "2026-06-25T20:00:00Z",
-      "E-0": "2026-06-15T19:00:00Z", "E-1": "2026-06-15T01:00:00Z",
-      "E-2": "2026-06-22T01:00:00Z", "E-3": "2026-06-22T19:00:00Z",
-      "E-4": "2026-06-28T01:00:00Z", "E-5": "2026-06-28T01:00:00Z",
-      "F-0": "2026-06-16T22:00:00Z", "F-1": "2026-06-15T22:00:00Z",
-      "F-2": "2026-06-21T19:00:00Z", "F-3": "2026-06-23T01:00:00Z",
-      "F-4": "2026-06-27T01:00:00Z", "F-5": "2026-06-27T01:00:00Z",
-      "G-0": "2026-06-17T19:00:00Z", "G-1": "2026-06-17T22:00:00Z",
-      "G-2": "2026-06-24T17:00:00Z", "G-3": "2026-06-23T22:00:00Z",
-      "G-4": "2026-06-27T20:00:00Z", "G-5": "2026-06-27T20:00:00Z",
-      "H-0": "2026-06-14T19:00:00Z", "H-1": "2026-06-14T16:00:00Z",
-      "H-2": "2026-06-21T16:00:00Z", "H-3": "2026-06-21T01:00:00Z",
-      "H-4": "2026-06-26T16:00:00Z", "H-5": "2026-06-26T16:00:00Z",
-      "I-0": "2026-06-15T16:00:00Z", "I-1": "2026-06-16T01:00:00Z",
-      "I-2": "2026-06-21T22:00:00Z", "I-3": "2026-06-22T22:00:00Z",
-      "I-4": "2026-06-27T16:00:00Z", "I-5": "2026-06-27T16:00:00Z",
-      "J-0": "2026-06-13T01:00:00Z", "J-1": "2026-06-14T22:00:00Z",
-      "J-2": "2026-06-19T16:00:00Z", "J-3": "2026-06-20T19:00:00Z",
-      "J-4": "2026-06-26T20:00:00Z", "J-5": "2026-06-26T20:00:00Z",
-      "K-0": "2026-06-16T16:00:00Z", "K-1": "2026-06-16T19:00:00Z",
-      "K-2": "2026-06-23T16:00:00Z", "K-3": "2026-06-23T19:00:00Z",
-      "K-4": "2026-06-28T20:00:00Z", "K-5": "2026-06-28T20:00:00Z",
-      "L-0": "2026-06-17T01:00:00Z", "L-1": "2026-06-18T01:00:00Z",
-      "L-2": "2026-06-25T16:00:00Z", "L-3": "2026-06-24T22:00:00Z",
-      "L-4": "2026-06-28T20:00:00Z", "L-5": "2026-06-28T20:00:00Z",
+      "B-0": "2026-06-12T19:00:00Z", "B-1": "2026-06-13T19:00:00Z",
+      "B-2": "2026-06-18T22:00:00Z", "B-3": "2026-06-18T19:00:00Z",
+      "B-4": "2026-06-24T19:00:00Z", "B-5": "2026-06-24T19:00:00Z",
+      "C-0": "2026-06-13T22:00:00Z", "C-1": "2026-06-14T01:00:00Z",
+      "C-2": "2026-06-20T00:30:00Z", "C-3": "2026-06-19T22:00:00Z",
+      "C-4": "2026-06-24T22:00:00Z", "C-5": "2026-06-24T22:00:00Z",
+      "D-0": "2026-06-13T01:00:00Z", "D-1": "2026-06-14T04:00:00Z",
+      "D-2": "2026-06-19T19:00:00Z", "D-3": "2026-06-20T03:00:00Z",
+      "D-4": "2026-06-26T02:00:00Z", "D-5": "2026-06-26T02:00:00Z",
+      "E-0": "2026-06-14T17:00:00Z", "E-1": "2026-06-14T23:00:00Z",
+      "E-2": "2026-06-20T20:00:00Z", "E-3": "2026-06-21T00:00:00Z",
+      "E-4": "2026-06-25T20:00:00Z", "E-5": "2026-06-25T20:00:00Z",
+      "F-0": "2026-06-14T20:00:00Z", "F-1": "2026-06-15T02:00:00Z",
+      "F-2": "2026-06-20T17:00:00Z", "F-3": "2026-06-21T04:00:00Z",
+      "F-4": "2026-06-25T23:00:00Z", "F-5": "2026-06-25T23:00:00Z",
+      "G-0": "2026-06-15T19:00:00Z", "G-1": "2026-06-16T01:00:00Z",
+      "G-2": "2026-06-21T19:00:00Z", "G-3": "2026-06-22T01:00:00Z",
+      "G-4": "2026-06-27T03:00:00Z", "G-5": "2026-06-27T03:00:00Z",
+      "H-0": "2026-06-15T16:00:00Z", "H-1": "2026-06-15T22:00:00Z",
+      "H-2": "2026-06-21T16:00:00Z", "H-3": "2026-06-21T22:00:00Z",
+      "H-4": "2026-06-27T00:00:00Z", "H-5": "2026-06-27T00:00:00Z",
+      "I-0": "2026-06-16T19:00:00Z", "I-1": "2026-06-16T22:00:00Z",
+      "I-2": "2026-06-22T21:00:00Z", "I-3": "2026-06-23T00:00:00Z",
+      "I-4": "2026-06-26T19:00:00Z", "I-5": "2026-06-26T19:00:00Z",
+      "J-0": "2026-06-17T01:00:00Z", "J-1": "2026-06-17T04:00:00Z",
+      "J-2": "2026-06-22T17:00:00Z", "J-3": "2026-06-23T03:00:00Z",
+      "J-4": "2026-06-28T02:00:00Z", "J-5": "2026-06-28T02:00:00Z",
+      "K-0": "2026-06-17T17:00:00Z", "K-1": "2026-06-18T02:00:00Z",
+      "K-2": "2026-06-23T17:00:00Z", "K-3": "2026-06-24T02:00:00Z",
+      "K-4": "2026-06-27T23:30:00Z", "K-5": "2026-06-27T23:30:00Z",
+      "L-0": "2026-06-17T20:00:00Z", "L-1": "2026-06-17T23:00:00Z",
+      "L-2": "2026-06-27T21:00:00Z", "L-3": "2026-06-27T21:00:00Z",
+      "L-4": "2026-06-23T20:00:00Z", "L-5": "2026-06-23T23:00:00Z",
       "ko-73": "2026-06-28T19:00:00Z",
       "ko-74": "2026-06-29T20:30:00Z",
       "ko-75": "2026-06-30T01:00:00Z",
@@ -483,8 +610,8 @@
       "ko-86": "2026-07-03T22:00:00Z",
       "ko-87": "2026-07-04T01:30:00Z",
       "ko-88": "2026-07-03T18:00:00Z",
-      "ko-89": "2026-07-04T17:00:00Z",
-      "ko-90": "2026-07-04T21:00:00Z",
+      "ko-89": "2026-07-04T21:00:00Z",
+      "ko-90": "2026-07-04T17:00:00Z",
       "ko-91": "2026-07-05T20:00:00Z",
       "ko-92": "2026-07-06T00:00:00Z",
       "ko-93": "2026-07-06T19:00:00Z",
@@ -631,6 +758,7 @@
         renderStandings(groupId);
         renderThirdPlace();
         renderBracket();
+        renderTodayMatches();
       });
     }
 
@@ -911,7 +1039,7 @@
       if (empty) delete state.ko[id];
       else state.ko[id] = next;
       saveState();
-      withFocusPreserved(() => renderBracket());
+      withFocusPreserved(() => { renderBracket(); renderTodayMatches(); });
     }
 
     function getKnockoutOutcome(id, which) {
@@ -1033,10 +1161,185 @@
       `;
     }
 
+    // ---------- Jogos do dia ----------
+
+    function matchClock(utc) {
+      if (!utc) return "";
+      return new Date(utc).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    }
+    // Dia local (do navegador) no formato YYYY-MM-DD, p/ comparar/ordenar.
+    function localDayKey(d) {
+      return new Date(d).toLocaleDateString("sv-SE");
+    }
+    function teamCell(t) {
+      return `<span class="flag">${t.flag}</span><span class="tc-name">${escapeHtml(t.name)}</span>`;
+    }
+    function koSideCell(slot) {
+      const r = resolveSlot(slot);
+      if (r) return teamCell(r);
+      return `<span class="tc-name tc-tbd">${escapeHtml(slotLabel(slot))}</span>`;
+    }
+    function koRoundLabel(id) {
+      return id <= 88 ? "16-avos" : id <= 96 ? "Oitavas" : id <= 100 ? "Quartas"
+           : id <= 102 ? "Semifinal" : id === 103 ? "3º Lugar" : "Final";
+    }
+
+    // Placar view-only no card: gols + (pênaltis) quando preenchidos.
+    function scoreCell(goals, pen) {
+      if (goals == null || goals === "") return "";
+      const penTxt = (pen != null && pen !== "") ? `<span class="tc-pen">(${escapeHtml(pen)})</span>` : "";
+      return `<span class="tc-score">${escapeHtml(goals)}${penTxt}</span>`;
+    }
+
+    // Todos os jogos (grupos + mata-mata) com data definida.
+    function allDatedMatches() {
+      const out = [];
+      for (const g of Object.keys(GROUPS)) {
+        const teams = GROUPS[g];
+        MATCH_PAIRS.forEach((pair, i) => {
+          const when = SCHEDULE[`${g}-${i}`];
+          if (!when) return;
+          const s = getGroupScore(g, i);
+          const filled = s.home !== "" && s.away !== "";
+          const winSide = !filled ? null : Number(s.home) > Number(s.away) ? "home" : Number(s.away) > Number(s.home) ? "away" : null;
+          out.push({
+            when, label: `Grupo ${g}`, jump: `g:${g}:${i}`,
+            home: teamCell(teams[pair[0]]), away: teamCell(teams[pair[1]]),
+            sHome: filled ? s.home : null, sAway: filled ? s.away : null, winSide,
+          });
+        });
+      }
+      for (const m of allKnockoutMatches()) {
+        const when = SCHEDULE[`ko-${m.id}`];
+        if (!when) continue;
+        const s = getKnockoutScore(m.id);
+        const filled = s.home !== "" && s.away !== "";
+        const tied = filled && Number(s.home) === Number(s.away);
+        const penFilled = tied && s.penHome !== "" && s.penAway !== "";
+        const winSide = !filled ? null
+          : Number(s.home) > Number(s.away) ? "home"
+          : Number(s.away) > Number(s.home) ? "away"
+          : penFilled ? (Number(s.penHome) > Number(s.penAway) ? "home" : "away") : null;
+        out.push({
+          when, label: koRoundLabel(m.id), jump: `ko:${m.id}`,
+          home: koSideCell(m.home), away: koSideCell(m.away),
+          sHome: filled ? s.home : null, sAway: filled ? s.away : null,
+          penHome: penFilled ? s.penHome : null, penAway: penFilled ? s.penAway : null, winSide,
+        });
+      }
+      return out;
+    }
+
+    // Dia em foco no painel (YYYY-MM-DD). null = usar o padrão (hoje / próximo).
+    let viewDayKey = null;
+
+    // Lista ordenada de dias que têm jogos.
+    function matchDayKeys() {
+      return [...new Set(allDatedMatches().map(m => localDayKey(m.when)))].sort();
+    }
+
+    function stepDay(delta) {
+      const dayKeys = matchDayKeys();
+      let idx = dayKeys.indexOf(viewDayKey);
+      if (idx < 0) return;
+      idx = Math.min(dayKeys.length - 1, Math.max(0, idx + delta));
+      viewDayKey = dayKeys[idx];
+      renderTodayMatches();
+    }
+
+    function renderTodayMatches() {
+      const el = document.getElementById("today-matches");
+      if (!el) return;
+      const all = allDatedMatches();
+      if (all.length === 0) {
+        el.innerHTML = `<div class="tc-empty">Sem jogos no momento.</div>`;
+        return;
+      }
+      const dayKeys = matchDayKeys();
+      const todayKey = localDayKey(Date.now());
+      // Foco padrão: hoje (se tiver jogo), senão o próximo dia futuro, senão o último.
+      const todayTarget = dayKeys.includes(todayKey)
+        ? todayKey
+        : (dayKeys.find(k => k > todayKey) || dayKeys[dayKeys.length - 1]);
+      if (viewDayKey == null || !dayKeys.includes(viewDayKey)) {
+        viewDayKey = todayTarget;
+      }
+      const idx = dayKeys.indexOf(viewDayKey);
+      const games = all
+        .filter(m => localDayKey(m.when) === viewDayKey)
+        .sort((a, b) => new Date(a.when) - new Date(b.when));
+
+      const dDays = Math.round((new Date(viewDayKey) - new Date(todayKey)) / 86400000);
+      const rel = dDays === 0 ? "Hoje" : dDays === 1 ? "Amanhã" : dDays === -1 ? "Ontem" : null;
+      const dateLabel = new Date(games[0].when)
+        .toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+      const title = rel ? `${rel} — ${dateLabel}` : dateLabel;
+
+      const heading = `
+        <div class="tc-daynav">
+          <button class="tc-today" data-day-home ${viewDayKey === todayTarget ? "disabled" : ""}>Hoje</button>
+          <button class="tc-arrow" data-day-nav="-1" ${idx <= 0 ? "disabled" : ""} aria-label="Dia anterior">‹</button>
+          <button class="tc-arrow" data-day-nav="1" ${idx >= dayKeys.length - 1 ? "disabled" : ""} aria-label="Próximo dia">›</button>
+          <span class="tc-daylabel">${title}</span>
+        </div>`;
+      const cards = games.map(m => `
+        <div class="today-card" data-jump="${m.jump}" role="button" tabindex="0" title="Ir para o jogo">
+          <div class="tc-head">
+            <span class="pill">${m.label}</span>
+            <span class="tc-time">${matchClock(m.when)}</span>
+          </div>
+          <div class="tc-row ${m.winSide === "home" ? "tc-win" : ""}">${m.home}${scoreCell(m.sHome, m.penHome)}</div>
+          <div class="tc-row ${m.winSide === "away" ? "tc-win" : ""}">${m.away}${scoreCell(m.sAway, m.penAway)}</div>
+        </div>`).join("");
+      el.innerHTML = heading + `<div class="today-grid">${cards}</div>`;
+    }
+
+    // Rola até a partida correspondente (linha do grupo ou card do mata-mata)
+    // e dá um destaque rápido. `jump` = "g:<grupo>:<i>" ou "ko:<id>".
+    function jumpToMatch(jump) {
+      if (!jump) return;
+      let el = null;
+      if (jump.startsWith("g:")) {
+        const [, g, i] = jump.split(":");
+        const inp = document.querySelector(`input[data-group="${g}"][data-i="${i}"]`);
+        el = inp ? inp.closest(".match-row") : null;
+      } else if (jump.startsWith("ko:")) {
+        const id = jump.slice(3);
+        const inp = document.querySelector(`input[data-ko="${id}"]`);
+        el = inp ? inp.closest(".ko-match") : null;
+      }
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.remove("jump-flash");
+      void el.offsetWidth; // força reinício da animação se já estava destacado
+      el.classList.add("jump-flash");
+    }
+
+    document.getElementById("today-matches").addEventListener("click", (ev) => {
+      const home = ev.target.closest("[data-day-home]");
+      if (home) {
+        if (!home.disabled) { viewDayKey = null; renderTodayMatches(); }
+        return;
+      }
+      const arrow = ev.target.closest("[data-day-nav]");
+      if (arrow) {
+        if (!arrow.disabled) stepDay(Number(arrow.dataset.dayNav));
+        return;
+      }
+      const card = ev.target.closest("[data-jump]");
+      if (card) jumpToMatch(card.dataset.jump);
+    });
+    document.getElementById("today-matches").addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      const card = ev.target.closest("[data-jump]");
+      if (card) { ev.preventDefault(); jumpToMatch(card.dataset.jump); }
+    });
+
     function renderAll() {
       renderGroups();
       renderThirdPlace();
       renderBracket();
+      renderTodayMatches();
     }
 
     // ---------- Events ----------

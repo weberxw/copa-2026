@@ -42,7 +42,16 @@
     }
     header h1 { margin: 0; font-size: 26px; letter-spacing: 0.2px; }
     header .sub { color: var(--muted); font-size: 14px; }
-    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .user-chip {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
     button, .btn {
       background: var(--surface);
       color: var(--text);
@@ -450,6 +459,7 @@
       <div class="sub">Preencha os placares manualmente.</div>
     </div>
     <div class="toolbar">
+      <span id="user-chip" class="user-chip" hidden></span>
       <button id="png-btn">Exportar PNG</button>
       <button id="reset-btn" class="danger">Limpar tudo</button>
     </div>
@@ -687,7 +697,16 @@
     async function fetchState() {
       const r = await fetch("/api/state", { cache: "no-store" });
       if (!r.ok) throw new Error("falha ao carregar state.json");
+      setCurrentUser(r.headers.get("X-Auth-User"));
       return r.json();
+    }
+
+    function setCurrentUser(user) {
+      const el = document.getElementById("user-chip");
+      if (!el) return;
+      if (!user || user === "default") { el.hidden = true; return; }
+      el.textContent = `Logado como ${user}`;
+      el.hidden = false;
     }
 
     async function postState(payload) {

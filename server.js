@@ -175,7 +175,10 @@ const server = http.createServer((req, res) => {
   if (url === "/api/state" && req.method === "GET") {
     readState(stateUser)
       .then((bodyOut) => {
-        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        res.writeHead(200, {
+          "Content-Type": "application/json; charset=utf-8",
+          "X-Auth-User": stateUser,
+        });
         res.end(bodyOut);
       })
       .catch((e) => {

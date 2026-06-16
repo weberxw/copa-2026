@@ -1,0 +1,21 @@
+# Blueprint do Render. Em New > Blueprint, conecte o repo e o Render lê isto.
+# As env vars com `sync: false` são pedidas no dashboard (não ficam no repo).
+services:
+  - type: web
+    name: copa-2026
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      # Basic Auth (protege o app inteiro). Defina os dois no dashboard.
+      - key: BASIC_AUTH_USER
+        sync: false
+      - key: BASIC_AUTH_PASS
+        sync: false
+      # Upstash Redis (persistência). Copie do dashboard do Upstash.
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false

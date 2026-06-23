@@ -467,7 +467,7 @@
   </header>
 
   <main>
-    <h2 class="phase-title">Jogos do dia</h2>
+    <h2 class="phase-title" id="today-title">Jogos do dia</h2>
     <div id="today-matches"></div>
 
     <h2 class="phase-title">Fase de Grupos</h2>
@@ -1453,6 +1453,11 @@
       toolbar.style.visibility = "hidden";
       status.style.visibility = "hidden";
 
+      // A seção "Jogos do dia" não entra no PNG (display:none pra não deixar lacuna).
+      const todayEls = [document.getElementById("today-title"), document.getElementById("today-matches")];
+      const prevTodayDisplay = todayEls.map((el) => (el ? el.style.display : null));
+      todayEls.forEach((el) => { if (el) el.style.display = "none"; });
+
       // Neutraliza o gradiente decorativo do body/html durante a captura
       // (caso contrário, na altura total da página, o gradiente do topo
       // contrasta com a cor base sólida e gera uma faixa "mais escura").
@@ -1488,6 +1493,7 @@
         document.documentElement.style.background = prevHtmlBg;
         toolbar.style.visibility = prevToolbar;
         status.style.visibility = prevStatus;
+        todayEls.forEach((el, i) => { if (el) el.style.display = prevTodayDisplay[i]; });
         window.scrollTo(0, prevScrollY);
         btn.textContent = original;
         btn.disabled = false;

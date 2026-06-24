@@ -846,7 +846,14 @@
 
     function renderGroup(groupId) {
       const teams = GROUPS[groupId];
-      const matchesHtml = MATCH_PAIRS.map((pair, i) => {
+      // Exibe os jogos em ordem de data. O slot (i) define o confronto e onde o
+      // placar é salvo, mas a ordem cronológica difere da ordem dos slots em
+      // alguns grupos (ex.: grupo L, que inverte os confrontos da 2ª/3ª rodada).
+      const order = MATCH_PAIRS.map((_, i) => i).sort((a, b) =>
+        new Date(SCHEDULE[`${groupId}-${a}`] || 0) - new Date(SCHEDULE[`${groupId}-${b}`] || 0)
+      );
+      const matchesHtml = order.map((i) => {
+        const pair = MATCH_PAIRS[i];
         const [hi, ai] = pair;
         const s = getGroupScore(groupId, i);
         const home = teams[hi], away = teams[ai];

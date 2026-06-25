@@ -75,8 +75,6 @@
       padding: 9px 16px; cursor: pointer; font-size: 14px; font-weight: 600;
     }
     #sim-pos button.active { background: var(--accent); color: #fff; }
-    #sim-pos button:disabled { cursor: default; }
-    #sim-pos.locked button:not(.active) { opacity: .35; }
     .sim-head { color: var(--muted); font-size: 15px; margin: 0 4px 14px; }
     .sim-round {
       display: flex; gap: 14px; align-items: baseline;
@@ -534,6 +532,7 @@
         <div id="sim-pos">
           <button data-pos="1" class="active">1º do grupo</button>
           <button data-pos="2">2º do grupo</button>
+          <button data-pos="3">3º do grupo</button>
         </div>
       </div>
       <div id="sim-path"></div>
@@ -1432,14 +1431,6 @@
         b.classList.toggle("active", b.dataset.pos === simPos));
     }
 
-    // Trava o seletor 1º/2º quando o grupo já está definido.
-    function setPosDisabled(disabled) {
-      const wrap = document.getElementById("sim-pos");
-      if (!wrap) return;
-      wrap.classList.toggle("locked", disabled);
-      wrap.querySelectorAll("button").forEach((b) => { b.disabled = disabled; });
-    }
-
     // Times que ainda podem ocupar um slot (considerando jogos já decididos).
     // "W<id>" decidido -> só o vencedor; senão expande a subárvore até as folhas.
     function possibleTeams(token) {
@@ -1501,29 +1492,29 @@
       if (!host) return;
       if (!simTeam) {
         host.innerHTML = `<div class="sim-empty">Escolha um time para ver os possíveis adversários até a final.</div>`;
-        setPosDisabled(false);
         return;
       }
       const [g, idxStr] = simTeam.split(":");
       const team = GROUPS[g][parseInt(idxStr)];
-      const rank = computeStandings(g).findIndex((r) => r.name === team.name); // 0..3
-      const decided = isGroupComplete(g);
-
-      // Considera o estado do grupo: se já está definido, trava na posição real.
-      if (decided && rank <= 1) simPos = String(rank + 1);
       syncPosButtons();
-      setPosDisabled(decided);
 
-      if (decided && rank >= 2) {
-        const txt = rank === 2
-          ? `${team.name} terminou em 3º no Grupo ${g}. O caminho do 3º colocado depende do sorteio entre os melhores 3ºs e ainda não está no simulador.`
-          : `${team.name} terminou em 4º no Grupo ${g} e não avançou para o mata-mata.`;
-        host.innerHTML = `<div class="sim-empty">${escapeHtml(txt)}</div>`;
-        return;
+      // Slot de entrada conforme a posição escolhida. Para o 3º, usa a atribuição
+      // oficial dos 8 melhores 3ºs (mesma do chaveamento) pra saber onde ele entra.
+      let entry, posTxt;
+      if (simPos === "3") {
+        const assign = thirdAssignmentCache;
+        const mid = assign ? Object.keys(assign).find((id) => assign[id] === g) : null;
+        if (!mid) {
+          host.innerHTML = `<div class="sim-empty">Como 3º do Grupo ${g}, o cruzamento depende de quais 3ºs colocados se classificam (os 8 melhores) e do sorteio por slot. Ainda não dá pra determinar — preencha mais resultados dos grupos.</div>`;
+          return;
+        }
+        entry = KO_R32.find((m) => m.id === parseInt(mid)).away;
+        posTxt = `3º do Grupo ${g} (entra no Jogo ${mid})`;
+      } else {
+        entry = `${simPos}${g}`;
+        posTxt = `${simPos}º do Grupo ${g}`;
       }
 
-      const entry = `${simPos}${g}`;
-      const posTxt = decided ? `${simPos}º do Grupo ${g} (já definido)` : `${simPos}º do Grupo ${g}`;
       const rowsHtml = pathToFinal(entry).map((step) => {
         const groups = opponentMatchups(step.opponent).map((grp) =>
           `<div class="sim-matchup">${grp.map(teamSpan).join('<span class="sim-ou">ou</span>')}</div>`
@@ -1565,8 +1556,9 @@
       if (simTeam) {
         const [g, idxStr] = simTeam.split(":");
         const name = GROUPS[g][parseInt(idxStr)].name;
+        // Default = posição atual no grupo (real se o grupo já acabou); dá pra trocar.
         const rank = computeStandings(g).findIndex((r) => r.name === name);
-        simPos = rank === 1 ? "2" : "1";
+        simPos = rank === 1 ? "2" : rank === 2 ? "3" : "1";
         syncPosButtons();
       }
       renderSimulator();

@@ -52,6 +52,42 @@
       font-size: 13px;
       font-weight: 600;
     }
+
+    /* ---------- Abas ---------- */
+    .tabs { display: flex; gap: 4px; margin: 4px 0 4px; border-bottom: 1px solid var(--border); }
+    .tab-btn {
+      background: transparent; border: none; border-bottom: 2px solid transparent;
+      border-radius: 0; color: var(--muted); padding: 10px 18px; cursor: pointer;
+      font-size: 15px; font-weight: 600;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ---------- Simulador de caminho ---------- */
+    .sim-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 4px 16px; }
+    #sim-team {
+      padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); font-size: 15px; min-width: 240px;
+    }
+    #sim-pos { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    #sim-pos button {
+      background: var(--surface); border: none; border-radius: 0; color: var(--muted);
+      padding: 9px 16px; cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    #sim-pos button.active { background: var(--accent); color: #fff; }
+    .sim-head { color: var(--muted); font-size: 15px; margin: 0 4px 14px; }
+    .sim-round {
+      display: flex; gap: 14px; align-items: baseline;
+      padding: 12px 4px; border-bottom: 1px dashed var(--border);
+    }
+    .sim-round-name { flex: 0 0 150px; color: var(--accent); font-weight: 600; font-size: 14px; }
+    .sim-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    .sim-chip {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+      padding: 4px 12px; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .sim-chip-slot { color: var(--muted); font-style: italic; }
+    .sim-empty { color: var(--muted); font-size: 15px; padding: 8px 4px; }
     button, .btn {
       background: var(--surface);
       color: var(--text);
@@ -466,7 +502,13 @@
     </div>
   </header>
 
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="painel">Painel</button>
+    <button class="tab-btn" data-tab="sim">Simulador</button>
+  </nav>
+
   <main>
+    <div id="tab-painel">
     <h2 class="phase-title" id="today-title">Jogos do dia</h2>
     <div id="today-matches"></div>
 
@@ -478,6 +520,19 @@
 
     <h2 class="phase-title">Mata-mata</h2>
     <div id="bracket"></div>
+    </div><!-- /tab-painel -->
+
+    <div id="tab-sim" hidden>
+      <h2 class="phase-title">Simulador de caminho</h2>
+      <div class="sim-controls">
+        <select id="sim-team"></select>
+        <div id="sim-pos">
+          <button data-pos="1" class="active">1º do grupo</button>
+          <button data-pos="2">2º do grupo</button>
+        </div>
+      </div>
+      <div id="sim-path"></div>
+    </div>
   </main>
 
   <div id="status" class="status">Salvo</div>
@@ -764,6 +819,7 @@
         renderThirdPlace();
         renderBracket();
         renderTodayMatches();
+        renderSimulator();
       });
     }
 
@@ -1051,7 +1107,7 @@
       if (empty) delete state.ko[id];
       else state.ko[id] = next;
       saveState();
-      withFocusPreserved(() => { renderBracket(); renderTodayMatches(); });
+      withFocusPreserved(() => { renderBracket(); renderTodayMatches(); renderSimulator(); });
     }
 
     function getKnockoutOutcome(id, which) {
@@ -1347,14 +1403,129 @@
       if (card) { ev.preventDefault(); jumpToMatch(card.dataset.jump); }
     });
 
+    // ---------- Simulador de caminho ----------
+
+    let simTeam = null;  // "G:idx"
+    let simPos = "1";    // "1" ou "2"
+
+    function populateSimTeam() {
+      const sel = document.getElementById("sim-team");
+      if (!sel || sel.options.length) return;
+      let html = `<option value="">— escolha um time —</option>`;
+      for (const g of Object.keys(GROUPS)) {
+        html += `<optgroup label="Grupo ${g}">`;
+        GROUPS[g].forEach((t, idx) => {
+          html += `<option value="${g}:${idx}">${t.flag} ${escapeHtml(t.name)}</option>`;
+        });
+        html += `</optgroup>`;
+      }
+      sel.innerHTML = html;
+    }
+
+    function syncPosButtons() {
+      document.querySelectorAll("#sim-pos button").forEach((b) =>
+        b.classList.toggle("active", b.dataset.pos === simPos));
+    }
+
+    // Times que ainda podem ocupar um slot (considerando jogos já decididos).
+    // "W<id>" decidido -> só o vencedor; senão expande a subárvore até as folhas.
+    function possibleTeams(token) {
+      if (token.startsWith("W") || token.startsWith("L")) {
+        const r = resolveSlot(token);
+        if (r) return [r];
+        const m = findKnockoutMatch(parseInt(token.slice(1)));
+        return [...possibleTeams(m.home), ...possibleTeams(m.away)];
+      }
+      const r = resolveSlot(token);
+      return r ? [r] : [{ label: slotLabel(token) }];
+    }
+
+    // Caminho do slot de entrada até a final: adversário (subárvore) por rodada.
+    function pathToFinal(entrySlot) {
+      const rounds = [
+        { name: "16-avos de final", matches: KO_R32 },
+        { name: "Oitavas de final", matches: KO_R16 },
+        { name: "Quartas de final", matches: KO_QF },
+        { name: "Semifinal", matches: KO_SF },
+        { name: "Final", matches: [KO_FINAL] },
+      ];
+      const steps = [];
+      let me = entrySlot;
+      for (const round of rounds) {
+        const m = round.matches.find((x) => x.home === me || x.away === me);
+        if (!m) break;
+        const opp = m.home === me ? m.away : m.home;
+        steps.push({ round: round.name, opponent: opp });
+        me = `W${m.id}`;
+      }
+      return steps;
+    }
+
+    function renderSimulator() {
+      populateSimTeam();
+      const host = document.getElementById("sim-path");
+      if (!host) return;
+      if (!simTeam) {
+        host.innerHTML = `<div class="sim-empty">Escolha um time para ver os possíveis adversários até a final.</div>`;
+        return;
+      }
+      const [g, idxStr] = simTeam.split(":");
+      const team = GROUPS[g][parseInt(idxStr)];
+      const entry = `${simPos}${g}`;
+      const rowsHtml = pathToFinal(entry).map((step) => {
+        const chips = possibleTeams(step.opponent).map((o) => o.name
+          ? `<span class="sim-chip"><span class="flag">${o.flag}</span>${escapeHtml(o.name)}</span>`
+          : `<span class="sim-chip sim-chip-slot">${escapeHtml(o.label)}</span>`).join("");
+        return `
+          <div class="sim-round">
+            <div class="sim-round-name">${step.round}</div>
+            <div class="sim-chips">${chips}</div>
+          </div>`;
+      }).join("");
+      host.innerHTML = `
+        <div class="sim-head">Caminho de <strong>${escapeHtml(team.name)}</strong> como ${simPos}º do Grupo ${g}, se avançar em cada fase. A lista vai afunilando conforme os jogos forem decididos.</div>
+        ${rowsHtml}`;
+    }
+
     function renderAll() {
       renderGroups();
       renderThirdPlace();
       renderBracket();
       renderTodayMatches();
+      renderSimulator();
     }
 
     // ---------- Events ----------
+
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
+        document.getElementById("tab-painel").hidden = tab !== "painel";
+        document.getElementById("tab-sim").hidden = tab !== "sim";
+        if (tab === "sim") renderSimulator();
+        window.scrollTo(0, 0);
+      });
+    });
+
+    document.getElementById("sim-team").addEventListener("change", (ev) => {
+      simTeam = ev.target.value || null;
+      if (simTeam) {
+        const [g, idxStr] = simTeam.split(":");
+        const name = GROUPS[g][parseInt(idxStr)].name;
+        const rank = computeStandings(g).findIndex((r) => r.name === name);
+        simPos = rank === 1 ? "2" : "1";
+        syncPosButtons();
+      }
+      renderSimulator();
+    });
+    document.querySelectorAll("#sim-pos button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        simPos = btn.dataset.pos;
+        syncPosButtons();
+        renderSimulator();
+      });
+    });
 
     document.addEventListener("input", (ev) => {
       const t = ev.target;
@@ -1460,6 +1631,13 @@
       toolbar.style.visibility = "hidden";
       status.style.visibility = "hidden";
 
+      // O PNG sempre captura o Painel (mesmo se a aba ativa for o Simulador).
+      const painelEl = document.getElementById("tab-painel");
+      const simEl = document.getElementById("tab-sim");
+      const prevPainelHidden = painelEl.hidden, prevSimHidden = simEl.hidden;
+      painelEl.hidden = false;
+      simEl.hidden = true;
+
       // A seção "Jogos do dia" não entra no PNG (display:none pra não deixar lacuna).
       const todayEls = [document.getElementById("today-title"), document.getElementById("today-matches")];
       const prevTodayDisplay = todayEls.map((el) => (el ? el.style.display : null));
@@ -1501,6 +1679,8 @@
         toolbar.style.visibility = prevToolbar;
         status.style.visibility = prevStatus;
         todayEls.forEach((el, i) => { if (el) el.style.display = prevTodayDisplay[i]; });
+        painelEl.hidden = prevPainelHidden;
+        simEl.hidden = prevSimHidden;
         window.scrollTo(0, prevScrollY);
         btn.textContent = original;
         btn.disabled = false;

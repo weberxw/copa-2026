@@ -532,7 +532,6 @@
         <div id="sim-pos">
           <button data-pos="1" class="active">1º do grupo</button>
           <button data-pos="2">2º do grupo</button>
-          <button data-pos="3">3º do grupo</button>
         </div>
       </div>
       <div id="sim-path"></div>
@@ -1498,23 +1497,8 @@
       const team = GROUPS[g][parseInt(idxStr)];
       syncPosButtons();
 
-      // Slot de entrada conforme a posição escolhida. Para o 3º, usa a atribuição
-      // oficial dos 8 melhores 3ºs (mesma do chaveamento) pra saber onde ele entra.
-      let entry, posTxt;
-      if (simPos === "3") {
-        const assign = thirdAssignmentCache;
-        const mid = assign ? Object.keys(assign).find((id) => assign[id] === g) : null;
-        if (!mid) {
-          host.innerHTML = `<div class="sim-empty">Como 3º do Grupo ${g}, o cruzamento depende de quais 3ºs colocados se classificam (os 8 melhores) e do sorteio por slot. Ainda não dá pra determinar — preencha mais resultados dos grupos.</div>`;
-          return;
-        }
-        entry = KO_R32.find((m) => m.id === parseInt(mid)).away;
-        posTxt = `3º do Grupo ${g} (entra no Jogo ${mid})`;
-      } else {
-        entry = `${simPos}${g}`;
-        posTxt = `${simPos}º do Grupo ${g}`;
-      }
-
+      const entry = `${simPos}${g}`;
+      const posTxt = `${simPos}º do Grupo ${g}`;
       const rowsHtml = pathToFinal(entry).map((step) => {
         const groups = opponentMatchups(step.opponent).map((grp) =>
           `<div class="sim-matchup">${grp.map(teamSpan).join('<span class="sim-ou">ou</span>')}</div>`
@@ -1558,7 +1542,7 @@
         const name = GROUPS[g][parseInt(idxStr)].name;
         // Default = posição atual no grupo (real se o grupo já acabou); dá pra trocar.
         const rank = computeStandings(g).findIndex((r) => r.name === name);
-        simPos = rank === 1 ? "2" : rank === 2 ? "3" : "1";
+        simPos = rank === 1 ? "2" : "1";
         syncPosButtons();
       }
       renderSimulator();

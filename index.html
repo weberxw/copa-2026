@@ -75,6 +75,8 @@
       padding: 9px 16px; cursor: pointer; font-size: 14px; font-weight: 600;
     }
     #sim-pos button.active { background: var(--accent); color: #fff; }
+    #sim-pos button:disabled { cursor: default; }
+    #sim-pos.locked button:not(.active) { opacity: .35; }
     .sim-head { color: var(--muted); font-size: 15px; margin: 0 4px 14px; }
     .sim-round {
       display: flex; gap: 14px; align-items: baseline;
@@ -1430,6 +1432,14 @@
         b.classList.toggle("active", b.dataset.pos === simPos));
     }
 
+    // Trava o seletor 1º/2º quando o grupo já está definido.
+    function setPosDisabled(disabled) {
+      const wrap = document.getElementById("sim-pos");
+      if (!wrap) return;
+      wrap.classList.toggle("locked", disabled);
+      wrap.querySelectorAll("button").forEach((b) => { b.disabled = disabled; });
+    }
+
     // Times que ainda podem ocupar um slot (considerando jogos já decididos).
     // "W<id>" decidido -> só o vencedor; senão expande a subárvore até as folhas.
     function possibleTeams(token) {
@@ -1491,11 +1501,29 @@
       if (!host) return;
       if (!simTeam) {
         host.innerHTML = `<div class="sim-empty">Escolha um time para ver os possíveis adversários até a final.</div>`;
+        setPosDisabled(false);
         return;
       }
       const [g, idxStr] = simTeam.split(":");
       const team = GROUPS[g][parseInt(idxStr)];
+      const rank = computeStandings(g).findIndex((r) => r.name === team.name); // 0..3
+      const decided = isGroupComplete(g);
+
+      // Considera o estado do grupo: se já está definido, trava na posição real.
+      if (decided && rank <= 1) simPos = String(rank + 1);
+      syncPosButtons();
+      setPosDisabled(decided);
+
+      if (decided && rank >= 2) {
+        const txt = rank === 2
+          ? `${team.name} terminou em 3º no Grupo ${g}. O caminho do 3º colocado depende do sorteio entre os melhores 3ºs e ainda não está no simulador.`
+          : `${team.name} terminou em 4º no Grupo ${g} e não avançou para o mata-mata.`;
+        host.innerHTML = `<div class="sim-empty">${escapeHtml(txt)}</div>`;
+        return;
+      }
+
       const entry = `${simPos}${g}`;
+      const posTxt = decided ? `${simPos}º do Grupo ${g} (já definido)` : `${simPos}º do Grupo ${g}`;
       const rowsHtml = pathToFinal(entry).map((step) => {
         const groups = opponentMatchups(step.opponent).map((grp) =>
           `<div class="sim-matchup">${grp.map(teamSpan).join('<span class="sim-ou">ou</span>')}</div>`
@@ -1507,7 +1535,7 @@
           </div>`;
       }).join("");
       host.innerHTML = `
-        <div class="sim-head">Caminho de <strong>${escapeHtml(team.name)}</strong> como ${simPos}º do Grupo ${g}, se avançar em cada fase. A lista vai afunilando conforme os jogos forem decididos.</div>
+        <div class="sim-head">Caminho de <strong>${escapeHtml(team.name)}</strong> como ${posTxt}, se avançar em cada fase. A lista vai afunilando conforme os jogos forem decididos.</div>
         ${rowsHtml}`;
     }
 

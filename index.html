@@ -1474,6 +1474,44 @@
       sel.innerHTML = html;
     }
 
+    // Time eliminado na fase de grupos: grupo encerrado e 4º, ou 3º fora dos 8 melhores.
+    function groupEliminated(name, g) {
+      if (!isGroupComplete(g)) return false;
+      const rank = computeStandings(g).findIndex((t) => t.name === name);
+      if (rank === 3) return true;
+      if (rank === 2) return !Object.values(thirdAssignmentCache || {}).includes(g);
+      return false;
+    }
+
+    // Times que perderam algum jogo do mata-mata já decidido.
+    function eliminatedInKnockout() {
+      const set = new Set();
+      for (const m of allKnockoutMatches()) {
+        const loser = getKnockoutOutcome(m.id, "loser");
+        if (loser) set.add(loser.name);
+      }
+      return set;
+    }
+
+    function isTeamEliminated(name, g, koOut) {
+      return groupEliminated(name, g) || (koOut || eliminatedInKnockout()).has(name);
+    }
+
+    // Desabilita no dropdown os times que já não podem chegar à final.
+    function updateSimTeamOptions() {
+      const sel = document.getElementById("sim-team");
+      if (!sel) return;
+      const koOut = eliminatedInKnockout();
+      for (const opt of sel.options) {
+        if (!opt.value) continue;
+        const [g, idxStr] = opt.value.split(":");
+        const t = GROUPS[g][parseInt(idxStr)];
+        const elim = isTeamEliminated(t.name, g, koOut);
+        opt.disabled = elim;
+        opt.textContent = `${t.flag} ${t.name}${elim ? " (eliminado)" : ""}`;
+      }
+    }
+
     function syncPosButtons() {
       document.querySelectorAll("#sim-pos button").forEach((b) =>
         b.classList.toggle("active", b.dataset.pos === simPos));
@@ -1536,6 +1574,7 @@
 
     function renderSimulator() {
       populateSimTeam();
+      updateSimTeamOptions();
       const host = document.getElementById("sim-path");
       if (!host) return;
       if (!simTeam) {
@@ -1545,6 +1584,11 @@
       const [g, idxStr] = simTeam.split(":");
       const team = GROUPS[g][parseInt(idxStr)];
       syncPosButtons();
+
+      if (isTeamEliminated(team.name, g)) {
+        host.innerHTML = `<div class="sim-empty">${escapeHtml(team.name)} foi eliminado e não tem mais caminho até a final.</div>`;
+        return;
+      }
 
       const entry = `${simPos}${g}`;
       const posTxt = `${simPos}º do Grupo ${g}`;

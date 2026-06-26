@@ -855,15 +855,17 @@
 
     function computeStandings(groupId) {
       const teams = GROUPS[groupId];
-      const stats = teams.map((t) => ({
-        name: t.name, flag: t.flag, P: 0, V: 0, E: 0, D: 0, GP: 0, GC: 0, SG: 0, Pts: 0,
+      const stats = teams.map((t, i) => ({
+        idx: i, name: t.name, flag: t.flag, P: 0, V: 0, E: 0, D: 0, GP: 0, GC: 0, SG: 0, Pts: 0,
       }));
+      const matches = []; // jogos lançados, p/ o confronto direto
       MATCH_PAIRS.forEach((pair, i) => {
         const s = getGroupScore(groupId, i);
         if (s.home === "" || s.away === "") return;
         const h = Number(s.home), a = Number(s.away);
         if (!Number.isFinite(h) || !Number.isFinite(a)) return;
         const [hi, ai] = pair;
+        matches.push({ hi, ai, h, a });
         stats[hi].P++; stats[ai].P++;
         stats[hi].GP += h; stats[hi].GC += a;
         stats[ai].GP += a; stats[ai].GC += h;
@@ -872,13 +874,60 @@
         else { stats[hi].E++; stats[ai].E++; stats[hi].Pts++; stats[ai].Pts++; }
       });
       stats.forEach(s => s.SG = s.GP - s.GC);
-      stats.sort((x, y) =>
-        y.Pts - x.Pts ||
-        y.SG - x.SG ||
-        y.GP - x.GP ||
-        x.name.localeCompare(y.name, "pt-BR")
-      );
-      return stats;
+
+      // Mini-tabela considerando só os jogos ENTRE os times do subconjunto.
+      function h2h(subset) {
+        const ids = new Set(subset.map(s => s.idx));
+        const mini = {};
+        subset.forEach(s => (mini[s.idx] = { Pts: 0, GD: 0, GF: 0 }));
+        for (const m of matches) {
+          if (!ids.has(m.hi) || !ids.has(m.ai)) continue;
+          mini[m.hi].GF += m.h; mini[m.ai].GF += m.a;
+          mini[m.hi].GD += m.h - m.a; mini[m.ai].GD += m.a - m.h;
+          if (m.h > m.a) mini[m.hi].Pts += 3;
+          else if (m.h < m.a) mini[m.ai].Pts += 3;
+          else { mini[m.hi].Pts++; mini[m.ai].Pts++; }
+        }
+        return mini;
+      }
+
+      const cmpName = (x, y) => x.name.localeCompare(y.name, "pt-BR");
+      // agrupa elementos consecutivos considerados "iguais" pelo comparador.
+      function runs(arr, eq) {
+        const out = [[arr[0]]];
+        for (let i = 1; i < arr.length; i++) {
+          (eq(arr[i - 1], arr[i]) ? out[out.length - 1] : out[out.push([]) - 1]).push(arr[i]);
+        }
+        return out;
+      }
+
+      // Critérios FIFA: 1-3 (Pts, SG, GP em todos os jogos); em empate, 4-6
+      // (confronto direto: Pts, SG, GP só entre os empatados, reaplicado ao
+      // subconjunto que seguir empatado); fallback alfabético (sem fair play/sorteio).
+      function breakH2H(tied) {
+        const mini = h2h(tied);
+        const cmp = (x, y) =>
+          mini[y.idx].Pts - mini[x.idx].Pts ||
+          mini[y.idx].GD - mini[x.idx].GD ||
+          mini[y.idx].GF - mini[x.idx].GF;
+        const sorted = [...tied].sort(cmp);
+        const out = [];
+        for (const run of runs(sorted, (a, b) => cmp(a, b) === 0)) {
+          if (run.length === 1) out.push(run[0]);
+          else if (run.length === tied.length) out.push(...run.sort(cmpName));
+          else out.push(...breakH2H(run));
+        }
+        return out;
+      }
+
+      const cmpAll = (x, y) => y.Pts - x.Pts || y.SG - x.SG || y.GP - x.GP;
+      const sorted = [...stats].sort(cmpAll);
+      const result = [];
+      for (const run of runs(sorted, (a, b) => cmpAll(a, b) === 0)) {
+        if (run.length === 1) result.push(run[0]);
+        else result.push(...breakH2H(run));
+      }
+      return result;
     }
 
     function isGroupComplete(groupId) {

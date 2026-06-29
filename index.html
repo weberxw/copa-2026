@@ -407,8 +407,8 @@
     .phase-head {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      justify-content: flex-start;
+      gap: 14px;
       margin: 28px 4px 12px;
       border-bottom: 1px solid var(--border);
       padding-bottom: 6px;
@@ -491,16 +491,16 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 22cqmin; height: 22cqmin;
+      width: 30cqmin; height: 30cqmin;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 226, 138, 0.85) 0%, rgba(255, 226, 138, 0) 70%);
+      background: radial-gradient(circle, rgba(255, 226, 138, 0.85) 0%, rgba(255, 226, 138, 0) 68%);
       z-index: 2;
       pointer-events: none;
     }
-    .radial-center .rc-trophy-svg {
-      width: 15cqmin;
-      height: auto;
-      filter: drop-shadow(0 3px 6px rgba(180, 130, 30, 0.45));
+    .radial-center .rc-trophy-img {
+      height: 28cqmin;
+      width: auto;
+      filter: drop-shadow(0 3px 6px rgba(150, 110, 30, 0.4));
     }
 
     /* Final + trophy */
@@ -1538,32 +1538,6 @@
     // 4=oitavas, 5=os 32 times dos 16-avos. Cada nó interno é o vencedor de um jogo
     // e fica um anel pra dentro dos seus dois participantes.
     const RADIAL_RING_R = [0, 14, 22, 30, 38, 46]; // % do raio por profundidade
-    // Taça da Copa do Mundo (estilizada, sem depender de imagem externa).
-    const WC_TROPHY_SVG = `
-      <svg class="rc-trophy-svg" viewBox="0 0 100 150" aria-label="Taça da Copa do Mundo">
-        <defs>
-          <linearGradient id="wcGoldA" x1="0" y1="0" x2="0.35" y2="1">
-            <stop offset="0" stop-color="#fbeca0"/><stop offset="0.4" stop-color="#e9c25a"/>
-            <stop offset="0.75" stop-color="#c8922f"/><stop offset="1" stop-color="#9c6a1d"/>
-          </linearGradient>
-          <linearGradient id="wcGoldB" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#fff6cc"/><stop offset="1" stop-color="#d6a23c"/>
-          </linearGradient>
-        </defs>
-        <ellipse cx="50" cy="143" rx="25" ry="5.5" fill="#7e561a"/>
-        <path d="M29 129 h42 v6 a6 6 0 0 1 -6 6 H35 a6 6 0 0 1 -6 -6 Z" fill="url(#wcGoldA)"/>
-        <rect x="32" y="120" width="36" height="9" rx="2.4" fill="url(#wcGoldB)"/>
-        <rect x="32" y="122" width="36" height="1.8" fill="#3f7d4f" opacity="0.8"/>
-        <rect x="32" y="125.4" width="36" height="1.8" fill="#3f7d4f" opacity="0.8"/>
-        <path d="M44 120 C30 100 33 74 50 60 C46 80 44 102 52 120 Z" fill="url(#wcGoldA)"/>
-        <path d="M56 120 C70 100 67 74 50 60 C54 80 56 102 48 120 Z" fill="url(#wcGoldB)"/>
-        <path d="M50 60 C41 72 42 96 50 120 C58 96 59 72 50 60 Z" fill="url(#wcGoldA)" opacity="0.85"/>
-        <circle cx="50" cy="40" r="22" fill="url(#wcGoldB)"/>
-        <ellipse cx="50" cy="40" rx="22" ry="7.5" fill="none" stroke="#9c6b22" stroke-width="1.1" opacity="0.5"/>
-        <path d="M50 18 C40 28 40 52 50 62 C60 52 60 28 50 18 Z" fill="none" stroke="#9c6b22" stroke-width="1.1" opacity="0.5"/>
-        <path d="M50 18 V62" stroke="#9c6b22" stroke-width="1" opacity="0.4"/>
-        <circle cx="50" cy="40" r="22" fill="none" stroke="#a06d1f" stroke-width="1" opacity="0.45"/>
-      </svg>`;
     function radialRingDepth(id) {
       if (id === 104) return 0;
       if (id === 101 || id === 102) return 1;
@@ -1604,10 +1578,9 @@
         return node.angle;
       })(root);
 
-      // 2) coleta nós + conectores estilo bracket (haste radial + arco + nó na junção)
+      // 2) coleta nós + conectores (linhas retas filho -> pai, pontilhado fraco)
       const nodes = [];
-      const paths = [];
-      const dots = [];
+      const lines = [];
       const f = (n) => n.toFixed(2);
       (function walk(node) {
         const isLeaf = !!node.leaf;
@@ -1616,30 +1589,18 @@
         node._x = x; node._y = y;
         const team = isLeaf ? resolveSlot(node.slot) : getKnockoutOutcome(node.id, "winner");
         nodes.push({ x, y, depth: node.depth, team, isChampion: node.id === 104, leaf: isLeaf });
-        if (isLeaf) return;
-        const [c1, c2] = node.children;
-        walk(c1); walk(c2);
-        if (node.depth === 0) {
-          // campeão no centro: duas hastes retas até os finalistas
-          paths.push(`M50 50 L${f(c1._x)} ${f(c1._y)}`);
-          paths.push(`M50 50 L${f(c2._x)} ${f(c2._y)}`);
-          return;
+        if (!isLeaf) {
+          for (const c of node.children) {
+            walk(c);
+            lines.push([x, y, c._x, c._y]);
+          }
         }
-        const elbowR = (r + RADIAL_RING_R[node.depth + 1]) / 2;
-        const [sx, sy] = radialPos(node.angle, elbowR);   // junção (haste encontra o arco)
-        const [j1x, j1y] = radialPos(c1.angle, elbowR);
-        const [j2x, j2y] = radialPos(c2.angle, elbowR);
-        const large = Math.abs(c2.angle - c1.angle) > 180 ? 1 : 0;
-        paths.push(`M${f(x)} ${f(y)} L${f(sx)} ${f(sy)}`);                                   // haste: pai -> junção
-        paths.push(`M${f(j1x)} ${f(j1y)} A${f(elbowR)} ${f(elbowR)} 0 ${large} 1 ${f(j2x)} ${f(j2y)}`); // arco entre os filhos
-        paths.push(`M${f(j1x)} ${f(j1y)} L${f(c1._x)} ${f(c1._y)}`);                          // ramo -> filho 1
-        paths.push(`M${f(j2x)} ${f(j2y)} L${f(c2._x)} ${f(c2._y)}`);                          // ramo -> filho 2
-        dots.push([sx, sy]);
       })(root);
 
-      const linesSvg =
-        `<path d="${paths.join(" ")}" fill="none" stroke="var(--border)" stroke-width="0.45" stroke-linecap="round" stroke-linejoin="round"/>` +
-        dots.map(([dx, dy]) => `<circle cx="${f(dx)}" cy="${f(dy)}" r="0.9" fill="#aab2c6"/>`).join("");
+      const linesSvg = lines
+        .map(([x1, y1, x2, y2]) =>
+          `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}"/>`)
+        .join("");
 
       // tamanho do disco por anel (cqmin = 1% do lado do contêiner)
       const DISC = { 1: 9.6, 2: 8.6, 3: 7.8, 4: 7.0, 5: 6.4 };
@@ -1660,11 +1621,13 @@
       const champion = getKnockoutOutcome(104, "winner");
       const champHtml = champion
         ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:50%;width:11cqmin;height:11cqmin;font-size:6cqmin"><span class="flag">${champion.flag}</span></div>`
-        : `<div class="radial-center">${WC_TROPHY_SVG}</div>`;
+        : `<div class="radial-center"><img class="rc-trophy-img" src="/trofeu-copa.png" alt="Taça da Copa do Mundo"></div>`;
 
       wrap.innerHTML = `
         <div class="radial-wrap">
-          <svg class="radial-lines" viewBox="0 0 100 100" preserveAspectRatio="none">${linesSvg}</svg>
+          <svg class="radial-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <g fill="none" stroke="var(--border)" stroke-width="0.5" stroke-linecap="round" stroke-dasharray="0.1 1.9" opacity="0.7">${linesSvg}</g>
+          </svg>
           ${nodesHtml}
           ${champHtml}
         </div>`;

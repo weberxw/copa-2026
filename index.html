@@ -1561,7 +1561,7 @@
     const RADIAL_DISC = { 1: 0.096, 2: 0.086, 3: 0.078, 4: 0.070, 5: 0.064 };
     const RADIAL_FONT = { 1: 0.052, 2: 0.046, 3: 0.042, 4: 0.038, 5: 0.034 };
     const RADIAL_CHAMP_TROPHY_Y = 45;
-    const RADIAL_CHAMP_FLAG_Y = 57.5;
+    const RADIAL_CHAMP_FLAG_Y = 62;
     const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
     // Calcula a geometria do chaveamento radial: nós (com posição x/y em %, anel,
@@ -2297,11 +2297,13 @@
           document.documentElement.offsetWidth,
           document.body.offsetWidth
         );
+        const radialExportBottom = radialRect ? radialRect.y + radialRect.size + 72 : 0;
         const exportHeight = Math.max(
           document.documentElement.scrollHeight,
           document.body.scrollHeight,
           document.documentElement.offsetHeight,
-          document.body.offsetHeight
+          document.body.offsetHeight,
+          radialExportBottom
         );
         const canvas = await window.html2canvas(document.body, {
           backgroundColor: FLAT_BG,

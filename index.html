@@ -117,6 +117,19 @@
       padding-bottom: 6px;
     }
 
+    /* Seções colapsáveis */
+    [data-collapse-id] { cursor: pointer; user-select: none; }
+    [data-collapse-id] .chevron {
+      display: inline-block;
+      width: 0.9em;
+      margin-right: 4px;
+      font-size: 0.8em;
+      color: var(--muted);
+      transition: transform .15s;
+    }
+    [data-collapse-id].collapsed .chevron { transform: rotate(-90deg); }
+    [data-collapse-id].collapsed + * { display: none !important; }
+
     /* ---------- Jogos do dia ---------- */
     .tc-daynav {
       display: flex;
@@ -515,7 +528,7 @@
     <h2 class="phase-title" id="today-title">Jogos do dia</h2>
     <div id="today-matches"></div>
 
-    <h2 class="phase-title">Fase de Grupos</h2>
+    <h2 class="phase-title" data-collapse-id="groups"><span class="chevron">▾</span>Fase de Grupos</h2>
     <div id="groups" class="groups-grid"></div>
 
     <h2 class="phase-title">3º Colocados (8 melhores avançam)</h2>
@@ -855,7 +868,7 @@
     // 1º de grupo -> id do jogo das 16-avos (ordem das colunas da tabela acima)
     const WINNER_TO_SLOT = { A:79, B:85, D:81, E:74, G:82, I:77, K:87, L:80 };
 
-    let state = { groups: {}, ko: {} };
+    let state = { groups: {}, ko: {}, ui: { collapsed: [] } };
     let saveTimer = null;
     let savingInFlight = false;
 
@@ -913,6 +926,32 @@
         }
       }, 250);
     }
+
+    // ---------- Seções colapsáveis (preferência salva por conta) ----------
+    function isCollapsed(id) {
+      return !!(state.ui && Array.isArray(state.ui.collapsed) && state.ui.collapsed.includes(id));
+    }
+    function toggleCollapsed(id) {
+      if (!state.ui || !Array.isArray(state.ui.collapsed)) state.ui = { collapsed: [] };
+      const arr = state.ui.collapsed;
+      const i = arr.indexOf(id);
+      if (i >= 0) arr.splice(i, 1);
+      else arr.push(id);
+      saveState();
+      syncCollapsibles();
+    }
+    // Aplica a classe .collapsed a todos os cabeçalhos colapsáveis presentes no DOM
+    // (estáticos e os rounds re-renderizados), conforme a preferência atual.
+    function syncCollapsibles() {
+      document.querySelectorAll("[data-collapse-id]").forEach((h) => {
+        h.classList.toggle("collapsed", isCollapsed(h.dataset.collapseId));
+      });
+    }
+    document.addEventListener("click", (e) => {
+      const h = e.target.closest("[data-collapse-id]");
+      if (!h) return;
+      toggleCollapsed(h.dataset.collapseId);
+    });
 
     function groupMatchKey(groupId, i) { return `${groupId}-${i}`; }
     function getGroupScore(groupId, i) {
@@ -1321,12 +1360,12 @@
     function renderBracket() {
       thirdAssignmentCache = assignThirdPlaces();
       const rounds = [
-        { title: "16-avos de final", matches: KO_R32 },
-        { title: "Oitavas de final", matches: KO_R16 },
-        { title: "Quartas de final", matches: KO_QF },
-        { title: "Semifinais", matches: KO_SF },
-        { title: "Disputa do 3º Lugar", matches: [KO_3RD] },
-        { title: "Final", matches: [KO_FINAL], isFinal: true },
+        { id: "ko-r32", title: "16-avos de final", matches: KO_R32 },
+        { id: "ko-r16", title: "Oitavas de final", matches: KO_R16 },
+        { id: "ko-qf", title: "Quartas de final", matches: KO_QF },
+        { id: "ko-sf", title: "Semifinais", matches: KO_SF },
+        { id: "ko-3rd", title: "Disputa do 3º Lugar", matches: [KO_3RD] },
+        { id: "ko-final", title: "Final", matches: [KO_FINAL], isFinal: true },
       ];
       const champion = getKnockoutOutcome(KO_FINAL.id, "winner");
       const championHtml = champion ? `
@@ -1341,7 +1380,7 @@
       const koTime = (m) => new Date(SCHEDULE[`ko-${m.id}`] || 0).getTime();
       const roundsHtml = rounds.map(r => `
         <div class="bracket-round ${r.isFinal ? "final-round" : ""}">
-          <h3>${r.title}</h3>
+          <h3 data-collapse-id="${r.id}"><span class="chevron">▾</span>${r.title}</h3>
           <div class="matches-grid">
             ${r.matches.slice().sort((a, b) => koTime(a) - koTime(b)).map(renderKoMatch).join("")}
           </div>
@@ -1350,6 +1389,7 @@
       document.getElementById("bracket").innerHTML = `
         <div class="bracket">${roundsHtml}${championHtml}</div>
       `;
+      syncCollapsibles();
     }
 
     function renderKoMatch(m) {
@@ -1813,7 +1853,7 @@
 
     document.getElementById("reset-btn").addEventListener("click", async () => {
       if (!confirm("Apagar todos os resultados preenchidos?")) return;
-      state = { groups: {}, ko: {} };
+      state = { groups: {}, ko: {}, ui: state.ui || { collapsed: [] } };
       try { await postState(state); flashStatus("Resetado"); }
       catch { flashStatus("Erro ao salvar"); }
       renderAll();
@@ -1943,9 +1983,12 @@
     (async () => {
       try {
         const loaded = await fetchState();
+        const loadedCollapsed = loaded && loaded.ui && Array.isArray(loaded.ui.collapsed)
+          ? loaded.ui.collapsed : [];
         state = {
           groups: (loaded && loaded.groups) || {},
           ko: (loaded && loaded.ko) || {},
+          ui: { collapsed: loadedCollapsed },
         };
       } catch (e) {
         alert("Não foi possível carregar os dados do servidor. Tente recarregar a página.");

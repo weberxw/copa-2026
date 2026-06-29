@@ -403,6 +403,91 @@
       gap: 12px;
     }
 
+    /* Alternador Lista / Círculo */
+    .view-toggle {
+      display: inline-flex;
+      gap: 0;
+      margin: -2px 4px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-2);
+      padding: 3px;
+    }
+    .view-toggle button {
+      border: none;
+      background: transparent;
+      border-radius: 999px;
+      padding: 5px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      box-shadow: none;
+    }
+    .view-toggle button:hover { background: transparent; color: var(--text); }
+    .view-toggle button.active {
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: var(--shadow);
+    }
+
+    /* Bracket radial (chaveamento circular) */
+    .radial-wrap {
+      position: relative;
+      width: min(94vw, 720px);
+      margin: 8px auto 0;
+      aspect-ratio: 1 / 1;
+      container-type: size;
+      background: radial-gradient(circle at 50% 50%, #fffdf4 0%, #fff8df 9%, var(--surface) 24%, var(--surface) 100%);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      box-shadow: var(--shadow);
+    }
+    .radial-wrap svg.radial-lines {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+    .radial-node {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 5px rgba(20, 30, 60, 0.14);
+      line-height: 1;
+      overflow: hidden;
+    }
+    .radial-node .flag { margin: 0; font-size: inherit; line-height: 1; vertical-align: 0; }
+    .radial-node.empty { background: var(--surface-2); border-style: dashed; opacity: 0.7; }
+    .radial-node.win { border-color: var(--accent); }
+    .radial-node.champ {
+      border-color: #ecc15a;
+      box-shadow: 0 0 0 3px rgba(236, 193, 90, 0.45), 0 4px 12px rgba(236, 193, 90, 0.4);
+      z-index: 3;
+    }
+    .radial-center {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22cqmin; height: 22cqmin;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 226, 138, 0.85) 0%, rgba(255, 226, 138, 0) 70%);
+      z-index: 2;
+      pointer-events: none;
+    }
+    .radial-center .rc-trophy {
+      font-size: 9cqmin;
+      filter: drop-shadow(0 3px 5px rgba(180, 130, 30, 0.4));
+    }
+
     /* Final + trophy */
     .bracket-round.final-round .matches-grid {
       grid-template-columns: minmax(280px, 480px);
@@ -538,7 +623,12 @@
     </div>
 
     <h2 class="phase-title">Mata-mata</h2>
+    <div class="view-toggle" id="bracket-view-toggle">
+      <button data-view="list" class="active">Lista</button>
+      <button data-view="circle">Círculo</button>
+    </div>
     <div id="bracket"></div>
+    <div id="bracket-radial" hidden></div>
     </div><!-- /tab-painel -->
 
     <div id="tab-sim" hidden>
@@ -954,6 +1044,28 @@
       const h = e.target.closest("[data-collapse-id]");
       if (!h) return;
       toggleCollapsed(h.dataset.collapseId);
+    });
+
+    // Alternador de visão do mata-mata (lista / círculo), preferência salva por conta.
+    function applyBracketView(v) {
+      const view = v === "circle" ? "circle" : "list";
+      const list = document.getElementById("bracket");
+      const radial = document.getElementById("bracket-radial");
+      if (list) list.hidden = view !== "list";
+      if (radial) radial.hidden = view !== "circle";
+      document.querySelectorAll("#bracket-view-toggle button").forEach((b) =>
+        b.classList.toggle("active", b.dataset.view === view));
+    }
+    function setBracketView(v) {
+      if (!state.ui || typeof state.ui !== "object") state.ui = { collapsed: [] };
+      state.ui.bracketView = v;
+      saveState();
+      applyBracketView(v);
+    }
+    document.getElementById("bracket-view-toggle").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-view]");
+      if (!b) return;
+      setBracketView(b.dataset.view);
     });
 
     function groupMatchKey(groupId, i) { return `${groupId}-${i}`; }
@@ -1393,6 +1505,106 @@
         <div class="bracket">${roundsHtml}${championHtml}</div>
       `;
       syncCollapsibles();
+      renderRadialBracket();
+    }
+
+    // ---------- Bracket radial (chaveamento circular, só visual) ----------
+    // Anéis do centro p/ fora: 0=campeão (troféu), 1=finalistas, 2=semi, 3=quartas,
+    // 4=oitavas, 5=os 32 times dos 16-avos. Cada nó interno é o vencedor de um jogo
+    // e fica um anel pra dentro dos seus dois participantes.
+    const RADIAL_RING_R = [0, 14, 22, 30, 38, 46]; // % do raio por profundidade
+    function radialRingDepth(id) {
+      if (id === 104) return 0;
+      if (id === 101 || id === 102) return 1;
+      if (id >= 97 && id <= 100) return 2;
+      if (id >= 89 && id <= 96) return 3;
+      if (id >= 73 && id <= 88) return 4;
+      return 5;
+    }
+    function radialBuildNode(id) {
+      const m = findKnockoutMatch(id);
+      if (id >= 73 && id <= 88) {
+        return { id, children: [{ leaf: true, slot: m.home }, { leaf: true, slot: m.away }] };
+      }
+      return { id, children: [radialBuildNode(+m.home.slice(1)), radialBuildNode(+m.away.slice(1))] };
+    }
+    function radialPos(angleDeg, rPct) {
+      const rad = (angleDeg * Math.PI) / 180;
+      return [50 + rPct * Math.cos(rad), 50 + rPct * Math.sin(rad)];
+    }
+    function renderRadialBracket() {
+      const wrap = document.getElementById("bracket-radial");
+      if (!wrap) return;
+
+      const root = radialBuildNode(104);
+      // 1) ângulos das folhas (32 times) em ordem de chaveamento; nós internos = média
+      let leafIdx = 0;
+      (function assign(node) {
+        if (node.leaf) {
+          node.depth = 5;
+          node.angle = -90 + (leafIdx + 0.5) * (360 / 32);
+          leafIdx++;
+          return node.angle;
+        }
+        const a1 = assign(node.children[0]);
+        const a2 = assign(node.children[1]);
+        node.angle = (a1 + a2) / 2;
+        node.depth = radialRingDepth(node.id);
+        return node.angle;
+      })(root);
+
+      // 2) coleta nós + linhas (filho -> pai)
+      const nodes = [];
+      const lines = [];
+      (function walk(node) {
+        const isLeaf = !!node.leaf;
+        const r = RADIAL_RING_R[node.depth];
+        const [x, y] = node.depth === 0 ? [50, 50] : radialPos(node.angle, r);
+        node._x = x; node._y = y;
+        const team = isLeaf ? resolveSlot(node.slot) : getKnockoutOutcome(node.id, "winner");
+        nodes.push({ x, y, depth: node.depth, team, isChampion: node.id === 104, leaf: isLeaf });
+        if (!isLeaf) {
+          for (const c of node.children) {
+            walk(c);
+            lines.push([x, y, c._x, c._y]);
+          }
+        }
+      })(root);
+
+      const linesSvg = lines
+        .map(([x1, y1, x2, y2]) =>
+          `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" />`)
+        .join("");
+
+      // tamanho do disco por anel (cqmin = 1% do lado do contêiner)
+      const DISC = { 1: 9.6, 2: 8.6, 3: 7.8, 4: 7.0, 5: 6.4 };
+      const FONT = { 1: 5.2, 2: 4.6, 3: 4.2, 4: 3.8, 5: 3.4 };
+      const nodesHtml = nodes
+        .filter(n => !n.isChampion) // o campeão é o troféu central
+        .map(n => {
+          const d = DISC[n.depth];
+          const cls = n.team ? (n.depth < 5 ? "radial-node win" : "radial-node") : "radial-node empty";
+          const content = n.team
+            ? `<span class="flag">${n.team.flag}</span>`
+            : "";
+          const title = n.team ? escapeHtml(n.team.name) : "";
+          return `<div class="${cls}" title="${title}" style="left:${n.x.toFixed(2)}%;top:${n.y.toFixed(2)}%;width:${d}cqmin;height:${d}cqmin;font-size:${FONT[n.depth]}cqmin">${content}</div>`;
+        })
+        .join("");
+
+      const champion = getKnockoutOutcome(104, "winner");
+      const champHtml = champion
+        ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:50%;width:11cqmin;height:11cqmin;font-size:6cqmin"><span class="flag">${champion.flag}</span></div>`
+        : `<div class="radial-center"><span class="rc-trophy">🏆</span></div>`;
+
+      wrap.innerHTML = `
+        <div class="radial-wrap">
+          <svg class="radial-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <g stroke="var(--border)" stroke-width="0.3" vector-effect="non-scaling-stroke">${linesSvg}</g>
+          </svg>
+          ${nodesHtml}
+          ${champHtml}
+        </div>`;
     }
 
     function renderKoMatch(m) {
@@ -1988,15 +2200,17 @@
         const loaded = await fetchState();
         const loadedCollapsed = loaded && loaded.ui && Array.isArray(loaded.ui.collapsed)
           ? loaded.ui.collapsed : [];
+        const loadedView = loaded && loaded.ui && loaded.ui.bracketView === "circle" ? "circle" : "list";
         state = {
           groups: (loaded && loaded.groups) || {},
           ko: (loaded && loaded.ko) || {},
-          ui: { collapsed: loadedCollapsed },
+          ui: { collapsed: loadedCollapsed, bracketView: loadedView },
         };
       } catch (e) {
         alert("Não foi possível carregar os dados do servidor. Tente recarregar a página.");
       }
       renderAll();
+      applyBracketView(state.ui && state.ui.bracketView);
     })();
   </script>
 </body>

@@ -1560,6 +1560,8 @@
     }
     const RADIAL_DISC = { 1: 0.096, 2: 0.086, 3: 0.078, 4: 0.070, 5: 0.064 };
     const RADIAL_FONT = { 1: 0.052, 2: 0.046, 3: 0.042, 4: 0.038, 5: 0.034 };
+    const RADIAL_CHAMP_TROPHY_Y = 45;
+    const RADIAL_CHAMP_FLAG_Y = 57.5;
     const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
     // Calcula a geometria do chaveamento radial: nós (com posição x/y em %, anel,
@@ -1624,9 +1626,10 @@
       const champion = getKnockoutOutcome(104, "winner");
       // A taça fica sempre no centro; com campeão, sobe um pouco e a bandeira dele
       // aparece logo abaixo — assim o conjunto taça+bandeira fica centralizado.
-      const trophyHtml = `<div class="radial-center" style="top:${champion ? "46%" : "50%"};width:${px(0.24)};height:${px(0.24)}"><img class="rc-trophy-img" src="/trofeu-copa.png" alt="Taça da Copa do Mundo" style="height:${px(0.19)}"></div>`;
+      const trophyTop = champion ? RADIAL_CHAMP_TROPHY_Y : 50;
+      const trophyHtml = `<div class="radial-center" style="top:${trophyTop}%;width:${px(0.24)};height:${px(0.24)}"><img class="rc-trophy-img" src="/trofeu-copa.png" alt="Taça da Copa do Mundo" style="height:${px(0.19)}"></div>`;
       const champHtml = champion
-        ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:62%;width:${px(0.1)};height:${px(0.1)};font-size:${px(0.052)}"><span class="flag">${champion.flag}</span></div>`
+        ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:${RADIAL_CHAMP_FLAG_Y}%;width:${px(0.1)};height:${px(0.1)};font-size:${px(0.052)}"><span class="flag">${champion.flag}</span></div>`
         : "";
 
       wrap.innerHTML = `
@@ -1663,7 +1666,7 @@
       const P = (pct) => (pct / 100) * size;
       const c = size / 2;
       const champion = getKnockoutOutcome(104, "winner");
-      const trophyCy = champion ? c - 0.04 * size : c; // sobe um pouco quando há campeão
+      const trophyCy = champion ? P(RADIAL_CHAMP_TROPHY_Y) : c;
 
       // fundo: disco branco + leve gradiente na borda + brilho dourado central
       ctx.fillStyle = "#ffffff";
@@ -1712,7 +1715,7 @@
         ctx.drawImage(tImg, c - tw / 2, trophyCy - th / 2, tw, th);
       }
       if (champion) {
-        const cy2 = c + 0.12 * size;
+        const cy2 = P(RADIAL_CHAMP_FLAG_Y);
         const rad = (0.1 * size) / 2;
         ctx.beginPath(); ctx.arc(c, cy2, rad, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff"; ctx.fill();
@@ -2273,13 +2276,12 @@
       const restoreInputs = inputsToSpans(document.body);
       const prevScrollY = window.scrollY;
       window.scrollTo(0, 0);
-
       try {
         await loadHtml2Canvas();
         const SCALE = 2;
         // Se a visão em círculo estiver ativa e visível, guardamos a posição do
-        // .radial-wrap pra desenhar nosso canvas (com as bandeiras) por cima da
-        // captura — o html2canvas não renderiza os emoji de bandeira do círculo.
+        // .radial-wrap e omitimos o DOM dele no clone do html2canvas; depois
+        // desenhamos nosso canvas limpo por cima. Isso evita render duplicado.
         let radialRect = null;
         const radialContainer = document.getElementById("bracket-radial");
         if (radialContainer && !radialContainer.hidden) {
@@ -2311,13 +2313,20 @@
           windowHeight: exportHeight,
           width: exportWidth,
           height: exportHeight,
+          onclone: (doc) => {
+            const cloneWrap = doc.querySelector("#bracket-radial .radial-wrap");
+            if (cloneWrap) cloneWrap.style.visibility = "hidden";
+          },
         });
         if (radialRect) {
           const circle = await radialToCanvas(radialRect.size, SCALE);
-          // html2canvas escala o conteúdo por SCALE a partir de (0,0) do documento.
-          const k = canvas.width / exportWidth;
           canvas.getContext("2d").drawImage(
-            circle, radialRect.x * k, radialRect.y * k, radialRect.size * k, radialRect.size * k);
+            circle,
+            radialRect.x * SCALE,
+            radialRect.y * SCALE,
+            radialRect.size * SCALE,
+            radialRect.size * SCALE
+          );
         }
         const dataUrl = canvas.toDataURL("image/png");
         const a = document.createElement("a");

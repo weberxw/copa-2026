@@ -121,9 +121,10 @@
     [data-collapse-id] { cursor: pointer; user-select: none; }
     [data-collapse-id] .chevron {
       display: inline-block;
-      width: 0.9em;
-      margin-right: 4px;
-      font-size: 0.8em;
+      width: 1.1em;
+      margin-right: 6px;
+      font-size: 1.25em;
+      line-height: 1;
       color: var(--muted);
       transition: transform .15s;
     }
@@ -529,10 +530,12 @@
     <div id="today-matches"></div>
 
     <h2 class="phase-title" data-collapse-id="groups"><span class="chevron">▾</span>Fase de Grupos</h2>
-    <div id="groups" class="groups-grid"></div>
+    <div class="collapse-body">
+      <div id="groups" class="groups-grid"></div>
 
-    <h2 class="phase-title">3º Colocados (8 melhores avançam)</h2>
-    <div id="third-place"></div>
+      <h2 class="phase-title">3º Colocados (8 melhores avançam)</h2>
+      <div id="third-place"></div>
+    </div>
 
     <h2 class="phase-title">Mata-mata</h2>
     <div id="bracket"></div>

@@ -1622,10 +1622,11 @@
         .join("");
 
       const champion = getKnockoutOutcome(104, "winner");
-      // A taça fica sempre no centro; se houver campeão, a bandeira dele aparece logo abaixo.
-      const trophyHtml = `<div class="radial-center" style="width:${px(0.24)};height:${px(0.24)}"><img class="rc-trophy-img" src="/trofeu-copa.png" alt="Taça da Copa do Mundo" style="height:${px(0.19)}"></div>`;
+      // A taça fica sempre no centro; com campeão, sobe um pouco e a bandeira dele
+      // aparece logo abaixo — assim o conjunto taça+bandeira fica centralizado.
+      const trophyHtml = `<div class="radial-center" style="top:${champion ? "46%" : "50%"};width:${px(0.24)};height:${px(0.24)}"><img class="rc-trophy-img" src="/trofeu-copa.png" alt="Taça da Copa do Mundo" style="height:${px(0.19)}"></div>`;
       const champHtml = champion
-        ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:66%;width:${px(0.1)};height:${px(0.1)};font-size:${px(0.052)}"><span class="flag">${champion.flag}</span></div>`
+        ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:62%;width:${px(0.1)};height:${px(0.1)};font-size:${px(0.052)}"><span class="flag">${champion.flag}</span></div>`
         : "";
 
       wrap.innerHTML = `
@@ -1661,15 +1662,17 @@
       ctx.scale(dpr, dpr);
       const P = (pct) => (pct / 100) * size;
       const c = size / 2;
+      const champion = getKnockoutOutcome(104, "winner");
+      const trophyCy = champion ? c - 0.04 * size : c; // sobe um pouco quando há campeão
 
       // fundo: disco branco + leve gradiente na borda + brilho dourado central
       ctx.fillStyle = "#ffffff";
       ctx.beginPath(); ctx.arc(c, c, c - 1, 0, Math.PI * 2); ctx.fill();
-      const glow = ctx.createRadialGradient(c, c, 0, c, c, size * 0.16);
+      const glow = ctx.createRadialGradient(c, trophyCy, 0, c, trophyCy, size * 0.16);
       glow.addColorStop(0, "rgba(255,226,138,0.85)");
       glow.addColorStop(1, "rgba(255,226,138,0)");
       ctx.fillStyle = glow;
-      ctx.beginPath(); ctx.arc(c, c, size * 0.16, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(c, trophyCy, size * 0.16, 0, Math.PI * 2); ctx.fill();
 
       // linhas conectoras (sólidas, leves)
       ctx.strokeStyle = "#c9cfdd";
@@ -1706,11 +1709,10 @@
       const tImg = await loadTrophy();
       if (tImg && tImg.width) {
         const th = 0.19 * size, tw = th * (tImg.width / tImg.height);
-        ctx.drawImage(tImg, c - tw / 2, c - th / 2, tw, th);
+        ctx.drawImage(tImg, c - tw / 2, trophyCy - th / 2, tw, th);
       }
-      const champion = getKnockoutOutcome(104, "winner");
       if (champion) {
-        const cy2 = c + 0.16 * size;
+        const cy2 = c + 0.12 * size;
         const rad = (0.1 * size) / 2;
         ctx.beginPath(); ctx.arc(c, cy2, rad, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff"; ctx.fill();
@@ -1721,26 +1723,6 @@
         ctx.fillText(champion.flag, c, cy2 + fs * 0.04);
       }
       return canvas;
-    }
-    // Compõe o canvas final de exportação: título em cima + o círculo.
-    async function radialExportCanvas() {
-      const size = 1200, dpr = 1, pad = 56, titleH = 150;
-      const circle = await radialToCanvas(size, 2);
-      const out = document.createElement("canvas");
-      out.width = size + pad * 2;
-      out.height = titleH + size + pad;
-      const ctx = out.getContext("2d");
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, out.width, out.height);
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#1b2440";
-      ctx.font = "700 56px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
-      ctx.fillText("Copa do Mundo 2026", out.width / 2, 74);
-      ctx.fillStyle = "#6b7390";
-      ctx.font = "600 26px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
-      ctx.fillText("Mata-mata", out.width / 2, 112);
-      ctx.drawImage(circle, pad, titleH, size, size);
-      return out;
     }
 
     function renderKoMatch(m) {
@@ -2260,26 +2242,6 @@
       btn.textContent = "Gerando…";
       btn.disabled = true;
 
-      // Na visão em círculo, exportamos o canvas desenhado por nós (não usa
-      // html2canvas, que não renderiza os emoji de bandeira).
-      if (state.ui && state.ui.bracketView === "circle") {
-        try {
-          const canvas = await radialExportCanvas();
-          const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = `copa-2026-mata-mata-${new Date().toISOString().slice(0, 10)}.png`;
-          a.click();
-          URL.revokeObjectURL(a.href);
-        } catch (e) {
-          alert("Falha ao gerar PNG: " + e.message);
-        } finally {
-          btn.textContent = original;
-          btn.disabled = false;
-        }
-        return;
-      }
-
       const toolbar = document.querySelector(".toolbar");
       const status = document.getElementById("status");
       const prevToolbar = toolbar.style.visibility;
@@ -2314,13 +2276,49 @@
 
       try {
         await loadHtml2Canvas();
+        const SCALE = 2;
+        // Se a visão em círculo estiver ativa e visível, guardamos a posição do
+        // .radial-wrap pra desenhar nosso canvas (com as bandeiras) por cima da
+        // captura — o html2canvas não renderiza os emoji de bandeira do círculo.
+        let radialRect = null;
+        const radialContainer = document.getElementById("bracket-radial");
+        if (radialContainer && !radialContainer.hidden) {
+          const wrap = radialContainer.querySelector(".radial-wrap");
+          if (wrap) {
+            const r = wrap.getBoundingClientRect();
+            radialRect = { x: r.left + window.scrollX, y: r.top + window.scrollY, size: wrap.offsetWidth };
+          }
+        }
+        const exportWidth = Math.max(
+          document.documentElement.scrollWidth,
+          document.body.scrollWidth,
+          document.documentElement.offsetWidth,
+          document.body.offsetWidth
+        );
+        const exportHeight = Math.max(
+          document.documentElement.scrollHeight,
+          document.body.scrollHeight,
+          document.documentElement.offsetHeight,
+          document.body.offsetHeight
+        );
         const canvas = await window.html2canvas(document.body, {
           backgroundColor: FLAT_BG,
-          scale: 2,
+          scale: SCALE,
           useCORS: true,
-          windowWidth: document.documentElement.scrollWidth,
-          windowHeight: document.documentElement.scrollHeight,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: exportWidth,
+          windowHeight: exportHeight,
+          width: exportWidth,
+          height: exportHeight,
         });
+        if (radialRect) {
+          const circle = await radialToCanvas(radialRect.size, SCALE);
+          // html2canvas escala o conteúdo por SCALE a partir de (0,0) do documento.
+          const k = canvas.width / exportWidth;
+          canvas.getContext("2d").drawImage(
+            circle, radialRect.x * k, radialRect.y * k, radialRect.size * k, radialRect.size * k);
+        }
         const dataUrl = canvas.toDataURL("image/png");
         const a = document.createElement("a");
         a.href = dataUrl;

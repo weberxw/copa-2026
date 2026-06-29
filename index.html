@@ -1338,11 +1338,12 @@
           </div>
         </div>
       ` : "";
+      const koTime = (m) => new Date(SCHEDULE[`ko-${m.id}`] || 0).getTime();
       const roundsHtml = rounds.map(r => `
         <div class="bracket-round ${r.isFinal ? "final-round" : ""}">
           <h3>${r.title}</h3>
           <div class="matches-grid">
-            ${r.matches.map(renderKoMatch).join("")}
+            ${r.matches.slice().sort((a, b) => koTime(a) - koTime(b)).map(renderKoMatch).join("")}
           </div>
         </div>
       `).join("");

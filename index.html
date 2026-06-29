@@ -447,10 +447,7 @@
     /* Bracket radial (chaveamento circular) */
     .radial-wrap {
       position: relative;
-      width: min(94vw, 720px);
-      margin: 8px auto 0;
-      aspect-ratio: 1 / 1;
-      container-type: size;
+      margin: 8px 0 0 4px;
       background: radial-gradient(circle at 50% 50%, #fffdf4 0%, #fff8df 9%, var(--surface) 24%, var(--surface) 100%);
       border: 1px solid var(--border);
       border-radius: 50%;
@@ -478,7 +475,6 @@
     }
     .radial-node .flag { margin: 0; font-size: inherit; line-height: 1; vertical-align: 0; }
     .radial-node.empty { background: var(--surface-2); border-style: dashed; opacity: 0.7; }
-    .radial-node.win { border-color: var(--accent); }
     .radial-node.champ {
       border-color: #ecc15a;
       box-shadow: 0 0 0 3px rgba(236, 193, 90, 0.45), 0 4px 12px rgba(236, 193, 90, 0.4);
@@ -491,14 +487,12 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 30cqmin; height: 30cqmin;
       border-radius: 50%;
       background: radial-gradient(circle, rgba(255, 226, 138, 0.85) 0%, rgba(255, 226, 138, 0) 68%);
       z-index: 2;
       pointer-events: none;
     }
     .radial-center .rc-trophy-img {
-      height: 28cqmin;
       width: auto;
       filter: drop-shadow(0 3px 6px rgba(150, 110, 30, 0.4));
     }
@@ -1092,6 +1086,13 @@
       if (!b) return;
       setBracketView(b.dataset.view);
     });
+    // O bracket radial é dimensionado em px conforme a largura da janela; re-renderiza no resize.
+    let radialResizeTimer = null;
+    window.addEventListener("resize", () => {
+      if (!state.ui || state.ui.bracketView !== "circle") return;
+      clearTimeout(radialResizeTimer);
+      radialResizeTimer = setTimeout(renderRadialBracket, 150);
+    });
 
     function groupMatchKey(groupId, i) { return `${groupId}-${i}`; }
     function getGroupScore(groupId, i) {
@@ -1557,12 +1558,15 @@
       const rad = (angleDeg * Math.PI) / 180;
       return [50 + rPct * Math.cos(rad), 50 + rPct * Math.sin(rad)];
     }
-    function renderRadialBracket() {
-      const wrap = document.getElementById("bracket-radial");
-      if (!wrap) return;
+    const RADIAL_DISC = { 1: 0.096, 2: 0.086, 3: 0.078, 4: 0.070, 5: 0.064 };
+    const RADIAL_FONT = { 1: 0.052, 2: 0.046, 3: 0.042, 4: 0.038, 5: 0.034 };
+    const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
+    // Calcula a geometria do chaveamento radial: nós (com posição x/y em %, anel,
+    // time) e linhas conectoras [x1,y1,x2,y2] em %. Usado tanto pelo DOM quanto
+    // pelo canvas de exportação.
+    function computeRadialLayout() {
       const root = radialBuildNode(104);
-      // 1) ângulos das folhas (32 times) em ordem de chaveamento; nós internos = média
       let leafIdx = 0;
       (function assign(node) {
         if (node.leaf) {
@@ -1577,11 +1581,8 @@
         node.depth = radialRingDepth(node.id);
         return node.angle;
       })(root);
-
-      // 2) coleta nós + conectores (linhas retas filho -> pai, pontilhado fraco)
       const nodes = [];
       const lines = [];
-      const f = (n) => n.toFixed(2);
       (function walk(node) {
         const isLeaf = !!node.leaf;
         const r = RADIAL_RING_R[node.depth];
@@ -1590,47 +1591,153 @@
         const team = isLeaf ? resolveSlot(node.slot) : getKnockoutOutcome(node.id, "winner");
         nodes.push({ x, y, depth: node.depth, team, isChampion: node.id === 104, leaf: isLeaf });
         if (!isLeaf) {
-          for (const c of node.children) {
-            walk(c);
-            lines.push([x, y, c._x, c._y]);
-          }
+          for (const c of node.children) { walk(c); lines.push([x, y, c._x, c._y]); }
         }
       })(root);
+      return { nodes, lines };
+    }
 
+    function renderRadialBracket() {
+      const wrap = document.getElementById("bracket-radial");
+      if (!wrap) return;
+
+      const { nodes, lines } = computeRadialLayout();
+      const f = (n) => n.toFixed(2);
       const linesSvg = lines
         .map(([x1, y1, x2, y2]) =>
           `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}"/>`)
         .join("");
 
-      // tamanho do disco por anel (cqmin = 1% do lado do contêiner)
-      const DISC = { 1: 9.6, 2: 8.6, 3: 7.8, 4: 7.0, 5: 6.4 };
-      const FONT = { 1: 5.2, 2: 4.6, 3: 4.2, 4: 3.8, 5: 3.4 };
+      const S = Math.max(300, Math.min((window.innerWidth || 800) - 56, 700));
+      const px = (frac) => (frac * S).toFixed(1) + "px";
+      const DISC = RADIAL_DISC, FONT = RADIAL_FONT;
       const nodesHtml = nodes
         .filter(n => !n.isChampion) // o campeão é o troféu central
         .map(n => {
-          const d = DISC[n.depth];
-          const cls = n.team ? (n.depth < 5 ? "radial-node win" : "radial-node") : "radial-node empty";
-          const content = n.team
-            ? `<span class="flag">${n.team.flag}</span>`
-            : "";
+          const cls = n.team ? "radial-node" : "radial-node empty";
+          const content = n.team ? `<span class="flag">${n.team.flag}</span>` : "";
           const title = n.team ? escapeHtml(n.team.name) : "";
-          return `<div class="${cls}" title="${title}" style="left:${n.x.toFixed(2)}%;top:${n.y.toFixed(2)}%;width:${d}cqmin;height:${d}cqmin;font-size:${FONT[n.depth]}cqmin">${content}</div>`;
+          return `<div class="${cls}" title="${title}" style="left:${n.x.toFixed(2)}%;top:${n.y.toFixed(2)}%;width:${px(DISC[n.depth])};height:${px(DISC[n.depth])};font-size:${px(FONT[n.depth])}">${content}</div>`;
         })
         .join("");
 
       const champion = getKnockoutOutcome(104, "winner");
       const champHtml = champion
-        ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:50%;width:11cqmin;height:11cqmin;font-size:6cqmin"><span class="flag">${champion.flag}</span></div>`
-        : `<div class="radial-center"><img class="rc-trophy-img" src="/trofeu-copa.png" alt="Taça da Copa do Mundo"></div>`;
+        ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:50%;width:${px(0.11)};height:${px(0.11)};font-size:${px(0.06)}"><span class="flag">${champion.flag}</span></div>`
+        : `<div class="radial-center" style="width:${px(0.24)};height:${px(0.24)}"><img class="rc-trophy-img" src="/trofeu-copa.png" alt="Taça da Copa do Mundo" style="height:${px(0.19)}"></div>`;
 
       wrap.innerHTML = `
-        <div class="radial-wrap">
+        <div class="radial-wrap" style="width:${S}px;height:${S}px">
           <svg class="radial-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <g fill="none" stroke="var(--border)" stroke-width="0.5" stroke-linecap="round" stroke-dasharray="0.1 1.9" opacity="0.7">${linesSvg}</g>
+            <g fill="none" stroke="var(--border)" stroke-width="0.4" stroke-linecap="round" opacity="0.75">${linesSvg}</g>
           </svg>
           ${nodesHtml}
           ${champHtml}
         </div>`;
+    }
+
+    // ---- Exportação do círculo via <canvas> próprio (html2canvas não desenha os
+    // emoji de bandeira; aqui usamos fillText/drawImage, que funcionam de verdade) ----
+    let _trophyImg = null;
+    function loadTrophy() {
+      if (_trophyImg) return Promise.resolve(_trophyImg);
+      return new Promise((res) => {
+        const im = new Image();
+        im.onload = () => { _trophyImg = im; res(im); };
+        im.onerror = () => res(null);
+        im.src = "/trofeu-copa.png";
+      });
+    }
+    // Desenha o chaveamento radial num canvas de lado `size` (px lógicos).
+    async function radialToCanvas(size, dpr) {
+      dpr = dpr || 2;
+      const { nodes, lines } = computeRadialLayout();
+      const canvas = document.createElement("canvas");
+      canvas.width = size * dpr; canvas.height = size * dpr;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+      const P = (pct) => (pct / 100) * size;
+      const c = size / 2;
+
+      // fundo: disco branco + leve gradiente na borda + brilho dourado central
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(c, c, c - 1, 0, Math.PI * 2); ctx.fill();
+      const glow = ctx.createRadialGradient(c, c, 0, c, c, size * 0.16);
+      glow.addColorStop(0, "rgba(255,226,138,0.85)");
+      glow.addColorStop(1, "rgba(255,226,138,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(c, c, size * 0.16, 0, Math.PI * 2); ctx.fill();
+
+      // linhas conectoras (sólidas, leves)
+      ctx.strokeStyle = "#c9cfdd";
+      ctx.lineWidth = Math.max(1, size * 0.0022);
+      ctx.lineCap = "round";
+      ctx.globalAlpha = 0.85;
+      for (const [x1, y1, x2, y2] of lines) {
+        ctx.beginPath(); ctx.moveTo(P(x1), P(y1)); ctx.lineTo(P(x2), P(y2)); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      // nós (discos + bandeira)
+      for (const n of nodes) {
+        if (n.isChampion) continue;
+        const rad = (RADIAL_DISC[n.depth] * size) / 2;
+        const cx = P(n.x), cy = P(n.y);
+        ctx.beginPath(); ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+        ctx.fillStyle = n.team ? "#ffffff" : "#f1f4fb";
+        ctx.fill();
+        ctx.lineWidth = Math.max(1, size * 0.0028);
+        ctx.strokeStyle = "#cdd5e6";
+        if (n.team) ctx.setLineDash([]);
+        else ctx.setLineDash([size * 0.008, size * 0.006]);
+        ctx.stroke(); ctx.setLineDash([]);
+        if (n.team) {
+          const fs = RADIAL_FONT[n.depth] * size;
+          ctx.font = `${fs}px ${EMOJI_FONT}`;
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(n.team.flag, cx, cy + fs * 0.04);
+        }
+      }
+
+      // centro: bandeira do campeão ou a taça
+      const champion = getKnockoutOutcome(104, "winner");
+      if (champion) {
+        const rad = (0.11 * size) / 2;
+        ctx.beginPath(); ctx.arc(c, c, rad, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff"; ctx.fill();
+        ctx.lineWidth = Math.max(2, size * 0.004); ctx.strokeStyle = "#ecc15a"; ctx.stroke();
+        const fs = 0.06 * size;
+        ctx.font = `${fs}px ${EMOJI_FONT}`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(champion.flag, c, c + fs * 0.04);
+      } else {
+        const tImg = await loadTrophy();
+        if (tImg && tImg.width) {
+          const th = 0.19 * size, tw = th * (tImg.width / tImg.height);
+          ctx.drawImage(tImg, c - tw / 2, c - th / 2, tw, th);
+        }
+      }
+      return canvas;
+    }
+    // Compõe o canvas final de exportação: título em cima + o círculo.
+    async function radialExportCanvas() {
+      const size = 1200, dpr = 1, pad = 56, titleH = 150;
+      const circle = await radialToCanvas(size, 2);
+      const out = document.createElement("canvas");
+      out.width = size + pad * 2;
+      out.height = titleH + size + pad;
+      const ctx = out.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, out.width, out.height);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#1b2440";
+      ctx.font = "700 56px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillText("Copa do Mundo 2026", out.width / 2, 74);
+      ctx.fillStyle = "#6b7390";
+      ctx.font = "600 26px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillText("Mata-mata", out.width / 2, 112);
+      ctx.drawImage(circle, pad, titleH, size, size);
+      return out;
     }
 
     function renderKoMatch(m) {
@@ -2149,6 +2256,26 @@
       const original = btn.textContent;
       btn.textContent = "Gerando…";
       btn.disabled = true;
+
+      // Na visão em círculo, exportamos o canvas desenhado por nós (não usa
+      // html2canvas, que não renderiza os emoji de bandeira).
+      if (state.ui && state.ui.bracketView === "circle") {
+        try {
+          const canvas = await radialExportCanvas();
+          const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = `copa-2026-mata-mata-${new Date().toISOString().slice(0, 10)}.png`;
+          a.click();
+          URL.revokeObjectURL(a.href);
+        } catch (e) {
+          alert("Falha ao gerar PNG: " + e.message);
+        } finally {
+          btn.textContent = original;
+          btn.disabled = false;
+        }
+        return;
+      }
 
       const toolbar = document.querySelector(".toolbar");
       const status = document.getElementById("status");

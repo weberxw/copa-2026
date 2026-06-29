@@ -1622,9 +1622,11 @@
         .join("");
 
       const champion = getKnockoutOutcome(104, "winner");
+      // A taça fica sempre no centro; se houver campeão, a bandeira dele aparece logo abaixo.
+      const trophyHtml = `<div class="radial-center" style="width:${px(0.24)};height:${px(0.24)}"><img class="rc-trophy-img" src="/trofeu-copa.png" alt="Taça da Copa do Mundo" style="height:${px(0.19)}"></div>`;
       const champHtml = champion
-        ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:50%;width:${px(0.11)};height:${px(0.11)};font-size:${px(0.06)}"><span class="flag">${champion.flag}</span></div>`
-        : `<div class="radial-center" style="width:${px(0.24)};height:${px(0.24)}"><img class="rc-trophy-img" src="/trofeu-copa.png" alt="Taça da Copa do Mundo" style="height:${px(0.19)}"></div>`;
+        ? `<div class="radial-node champ" title="${escapeHtml(champion.name)}" style="left:50%;top:66%;width:${px(0.1)};height:${px(0.1)};font-size:${px(0.052)}"><span class="flag">${champion.flag}</span></div>`
+        : "";
 
       wrap.innerHTML = `
         <div class="radial-wrap" style="width:${S}px;height:${S}px">
@@ -1632,6 +1634,7 @@
             <g fill="none" stroke="var(--border)" stroke-width="0.4" stroke-linecap="round" opacity="0.75">${linesSvg}</g>
           </svg>
           ${nodesHtml}
+          ${trophyHtml}
           ${champHtml}
         </div>`;
     }
@@ -1699,23 +1702,23 @@
         }
       }
 
-      // centro: bandeira do campeão ou a taça
+      // centro: a taça sempre; se houver campeão, a bandeira dele logo abaixo
+      const tImg = await loadTrophy();
+      if (tImg && tImg.width) {
+        const th = 0.19 * size, tw = th * (tImg.width / tImg.height);
+        ctx.drawImage(tImg, c - tw / 2, c - th / 2, tw, th);
+      }
       const champion = getKnockoutOutcome(104, "winner");
       if (champion) {
-        const rad = (0.11 * size) / 2;
-        ctx.beginPath(); ctx.arc(c, c, rad, 0, Math.PI * 2);
+        const cy2 = c + 0.16 * size;
+        const rad = (0.1 * size) / 2;
+        ctx.beginPath(); ctx.arc(c, cy2, rad, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff"; ctx.fill();
         ctx.lineWidth = Math.max(2, size * 0.004); ctx.strokeStyle = "#ecc15a"; ctx.stroke();
-        const fs = 0.06 * size;
+        const fs = 0.052 * size;
         ctx.font = `${fs}px ${EMOJI_FONT}`;
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText(champion.flag, c, c + fs * 0.04);
-      } else {
-        const tImg = await loadTrophy();
-        if (tImg && tImg.width) {
-          const th = 0.19 * size, tw = th * (tImg.width / tImg.height);
-          ctx.drawImage(tImg, c - tw / 2, c - th / 2, tw, th);
-        }
+        ctx.fillText(champion.flag, c, cy2 + fs * 0.04);
       }
       return canvas;
     }

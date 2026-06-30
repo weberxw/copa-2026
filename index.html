@@ -1637,9 +1637,9 @@
       })(root);
 
       const totalH = TREE_HEAD_H + TREE_PAD + 16 * TREE_ROW_PITCH + TREE_PAD;
-      // +26 de folga à direita: a caixa do campeão tem box-shadow dourada que
-      // ultrapassa a borda; sem isso o PNG corta a sombra (e o exportWidth fica curto).
-      const totalW = colX(5) + TREE_CHAMP_W + 26;
+      // Campeão fica acima da final (na própria coluna da final), então a árvore
+      // tem só 5 colunas — cabe na tela/PNG sem esticar pra direita.
+      const totalW = colX(4) + TREE_COL_W + TREE_PAD;
 
       // Conectores em cotovelo (filho -> pai) + linha pontilhada final -> campeão.
       let linesSvg = "";
@@ -1665,12 +1665,15 @@
         `<div class="tree-head" style="left:${colX(4)}px;top:${thirdY - TREE_ROW_PITCH / 2 - 6}px;width:${TREE_COL_W}px">Disputa do 3º Lugar</div>` +
         `<div class="tree-node" style="left:${colX(4)}px;top:${thirdY}px;width:${TREE_COL_W}px">${renderKoMatch(KO_3RD)}</div>`;
 
-      // Campeão à direita da final.
+      // Campeão acima da final, na mesma coluna. Conector vertical tracejado
+      // ligando o topo da final à base da caixa do campeão.
       const champion = getKnockoutOutcome(104, "winner");
-      const champX = colX(5);
-      linesSvg += `<path class="tree-line-dash" d="M${root.x + TREE_COL_W} ${root.y} H${champX}"/>`;
+      const champCx = colX(4) + TREE_COL_W / 2;
+      const champCy = root.y - 168;
+      const champLeft = colX(4) + (TREE_COL_W - TREE_CHAMP_W) / 2;
+      linesSvg += `<path class="tree-line-dash" d="M${champCx} ${root.y - 64} V${champCy + 44}"/>`;
       const champHtml = `
-        <div class="tree-champ ${champion ? "" : "empty"}" style="left:${champX}px;top:${root.y}px;width:${TREE_CHAMP_W}px">
+        <div class="tree-champ ${champion ? "" : "empty"}" style="left:${champLeft}px;top:${champCy}px;width:${TREE_CHAMP_W}px">
           <div class="trophy">🏆</div>
           <div class="champ-label">Campeão</div>
           <div class="champ-team">${champion ? `<span class="flag">${champion.flag}</span>${escapeHtml(champion.name)}` : "—"}</div>

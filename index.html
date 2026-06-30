@@ -444,6 +444,50 @@
       box-shadow: var(--shadow);
     }
 
+    /* Bracket em árvore (chaveamento horizontal) */
+    #bracket-tree { overflow-x: auto; overflow-y: hidden; padding: 2px 2px 10px; }
+    .tree-wrap { position: relative; }
+    .tree-wrap svg.tree-lines {
+      position: absolute; inset: 0; pointer-events: none; overflow: visible;
+    }
+    .tree-wrap svg .tree-line-dash { stroke-dasharray: 4 5; opacity: 0.8; }
+    .tree-head {
+      position: absolute;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .tree-node {
+      position: absolute;
+      transform: translateY(-50%);
+    }
+    .tree-node .ko-match { width: 100%; box-sizing: border-box; margin: 0; }
+    .tree-champ {
+      position: absolute;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 12px 14px;
+      border: 1px solid #ecc15a;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #fffdf4, #fff3cf);
+      box-shadow: 0 0 0 3px rgba(236, 193, 90, 0.28), var(--shadow);
+      text-align: center;
+    }
+    .tree-champ .trophy { font-size: 26px; line-height: 1; }
+    .tree-champ .champ-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
+      color: #b8862b; font-weight: 700;
+    }
+    .tree-champ .champ-team { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+    .tree-champ.empty { opacity: 0.7; }
+
     /* Bracket radial (chaveamento circular) */
     .radial-wrap {
       position: relative;
@@ -639,6 +683,11 @@
             <line x1="3" y1="4" x2="13" y2="4"/><line x1="3" y1="8" x2="13" y2="8"/><line x1="3" y1="12" x2="13" y2="12"/>
           </svg>
         </button>
+        <button data-view="tree" title="Árvore" aria-label="Árvore">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 4h3v4h3"/><path d="M2 12h3v-4"/><path d="M8 8h6"/>
+          </svg>
+        </button>
         <button data-view="circle" title="Círculo" aria-label="Círculo">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
             <circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none"/>
@@ -647,6 +696,7 @@
       </div>
     </div>
     <div id="bracket"></div>
+    <div id="bracket-tree" hidden></div>
     <div id="bracket-radial" hidden></div>
     </div><!-- /tab-painel -->
 
@@ -1065,12 +1115,14 @@
       toggleCollapsed(h.dataset.collapseId);
     });
 
-    // Alternador de visão do mata-mata (lista / círculo), preferência salva por conta.
+    // Alternador de visão do mata-mata (lista / árvore / círculo), preferência salva por conta.
     function applyBracketView(v) {
-      const view = v === "circle" ? "circle" : "list";
+      const view = (v === "circle" || v === "tree") ? v : "list";
       const list = document.getElementById("bracket");
+      const tree = document.getElementById("bracket-tree");
       const radial = document.getElementById("bracket-radial");
       if (list) list.hidden = view !== "list";
+      if (tree) tree.hidden = view !== "tree";
       if (radial) radial.hidden = view !== "circle";
       document.querySelectorAll("#bracket-view-toggle button").forEach((b) =>
         b.classList.toggle("active", b.dataset.view === view));
@@ -1125,7 +1177,10 @@
       }
       fn();
       if (selector) {
-        const el = document.querySelector(selector);
+        // Lista e árvore têm inputs com o mesmo data-ko; restauramos o foco no
+        // que está visível (offsetParent != null), não no de uma visão oculta.
+        const matches = Array.from(document.querySelectorAll(selector));
+        const el = matches.find((m) => m.offsetParent !== null) || matches[0];
         if (el) {
           el.focus({ preventScroll: true });
           try { el.setSelectionRange(selStart, selEnd); } catch {}
@@ -1531,7 +1586,107 @@
         <div class="bracket">${roundsHtml}${championHtml}</div>
       `;
       syncCollapsibles();
+      renderTreeBracket();
       renderRadialBracket();
+    }
+
+    // ---------- Bracket em árvore (chaveamento horizontal, editável) ----------
+    // Mesma estrutura do radial (binária a partir da final 104), mas disposta em
+    // colunas: 16-avos -> oitavas -> quartas -> semis -> final, ligadas por
+    // conectores em cotovelo. Reaproveita os cards editáveis do renderKoMatch.
+    const TREE_COL_W = 230;     // largura do card
+    const TREE_COL_GAP = 62;    // espaço entre colunas (onde passam os conectores)
+    const TREE_ROW_PITCH = 116; // distância vertical entre confrontos dos 16-avos
+    const TREE_HEAD_H = 30;     // faixa dos títulos de fase no topo
+    const TREE_PAD = 8;
+    const TREE_CHAMP_W = 170;
+    const TREE_TITLES = ["16-avos de final", "Oitavas de final", "Quartas de final", "Semifinais", "Final"];
+
+    function treeBuildNode(id) {
+      const m = findKnockoutMatch(id);
+      if (id >= 73 && id <= 88) return { id, leaf: true };
+      return { id, children: [treeBuildNode(+m.home.slice(1)), treeBuildNode(+m.away.slice(1))] };
+    }
+
+    function renderTreeBracket() {
+      const wrap = document.getElementById("bracket-tree");
+      if (!wrap) return;
+
+      const root = treeBuildNode(104);
+      const colX = (col) => TREE_PAD + col * (TREE_COL_W + TREE_COL_GAP);
+
+      // Atribui profundidade (final=0) e posição vertical: folhas em passo fixo,
+      // cada nó interno no meio dos dois filhos.
+      let leafIdx = 0;
+      const nodes = [];
+      (function assign(node) {
+        if (node.leaf) {
+          node.depth = 4;
+          node.y = TREE_HEAD_H + TREE_PAD + leafIdx * TREE_ROW_PITCH + TREE_ROW_PITCH / 2;
+          leafIdx++;
+        } else {
+          node.children.forEach(assign);
+          node.depth = node.children[0].depth - 1;
+          node.y = (node.children[0].y + node.children[1].y) / 2;
+        }
+        node.col = 4 - node.depth;
+        node.x = colX(node.col);
+        nodes.push(node);
+      })(root);
+
+      const totalH = TREE_HEAD_H + TREE_PAD + 16 * TREE_ROW_PITCH + TREE_PAD;
+      const totalW = colX(5) + TREE_CHAMP_W + TREE_PAD;
+
+      // Conectores em cotovelo (filho -> pai) + linha pontilhada final -> campeão.
+      let linesSvg = "";
+      for (const n of nodes) {
+        if (n.leaf) continue;
+        for (const c of n.children) {
+          const x1 = c.x + TREE_COL_W, y1 = c.y;
+          const midX = x1 + TREE_COL_GAP / 2;
+          linesSvg += `<path d="M${x1} ${y1} H${midX} V${n.y} H${n.x}"/>`;
+        }
+      }
+
+      // Cards editáveis, posicionados em (x, y) com centro vertical em y.
+      const cardsHtml = nodes.map((n) => {
+        const m = findKnockoutMatch(n.id);
+        return `<div class="tree-node" style="left:${n.x}px;top:${n.y}px;width:${TREE_COL_W}px">${renderKoMatch(m)}</div>`;
+      }).join("");
+
+      // Disputa do 3º lugar: confronto solto (não entra na árvore principal),
+      // posicionado abaixo da final.
+      const thirdY = root.y + 210;
+      const thirdHtml =
+        `<div class="tree-head" style="left:${colX(4)}px;top:${thirdY - TREE_ROW_PITCH / 2 - 6}px;width:${TREE_COL_W}px">Disputa do 3º Lugar</div>` +
+        `<div class="tree-node" style="left:${colX(4)}px;top:${thirdY}px;width:${TREE_COL_W}px">${renderKoMatch(KO_3RD)}</div>`;
+
+      // Campeão à direita da final.
+      const champion = getKnockoutOutcome(104, "winner");
+      const champX = colX(5);
+      linesSvg += `<path class="tree-line-dash" d="M${root.x + TREE_COL_W} ${root.y} H${champX}"/>`;
+      const champHtml = `
+        <div class="tree-champ ${champion ? "" : "empty"}" style="left:${champX}px;top:${root.y}px;width:${TREE_CHAMP_W}px">
+          <div class="trophy">🏆</div>
+          <div class="champ-label">Campeão</div>
+          <div class="champ-team">${champion ? `<span class="flag">${champion.flag}</span>${escapeHtml(champion.name)}` : "—"}</div>
+        </div>`;
+
+      const headsHtml = TREE_TITLES.map((t, col) =>
+        `<div class="tree-head" style="left:${colX(col)}px;top:${TREE_PAD}px;width:${TREE_COL_W}px">${t}</div>`
+      ).join("");
+
+      wrap.style.height = totalH + "px";
+      wrap.innerHTML = `
+        <div class="tree-wrap" style="width:${totalW}px;height:${totalH}px">
+          <svg class="tree-lines" width="${totalW}" height="${totalH}">
+            <g fill="none" stroke="var(--border)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${linesSvg}</g>
+          </svg>
+          ${headsHtml}
+          ${cardsHtml}
+          ${thirdHtml}
+          ${champHtml}
+        </div>`;
     }
 
     // ---------- Bracket radial (chaveamento circular, só visual) ----------
@@ -2370,7 +2525,8 @@
         const loaded = await fetchState();
         const loadedCollapsed = loaded && loaded.ui && Array.isArray(loaded.ui.collapsed)
           ? loaded.ui.collapsed : [];
-        const loadedView = loaded && loaded.ui && loaded.ui.bracketView === "circle" ? "circle" : "list";
+        const savedView = loaded && loaded.ui && loaded.ui.bracketView;
+        const loadedView = (savedView === "circle" || savedView === "tree") ? savedView : "list";
         state = {
           groups: (loaded && loaded.groups) || {},
           ko: (loaded && loaded.ko) || {},

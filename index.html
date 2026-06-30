@@ -468,6 +468,7 @@
     .tree-champ {
       position: absolute;
       transform: translateY(-50%);
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -485,7 +486,7 @@
       font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
       color: #b8862b; font-weight: 700;
     }
-    .tree-champ .champ-team { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+    .tree-champ .champ-team { font-size: 13px; font-weight: 600; color: var(--text); text-align: center; line-height: 1.3; }
     .tree-champ.empty { opacity: 0.7; }
 
     /* Bracket radial (chaveamento circular) */
@@ -1636,7 +1637,9 @@
       })(root);
 
       const totalH = TREE_HEAD_H + TREE_PAD + 16 * TREE_ROW_PITCH + TREE_PAD;
-      const totalW = colX(5) + TREE_CHAMP_W + TREE_PAD;
+      // +26 de folga à direita: a caixa do campeão tem box-shadow dourada que
+      // ultrapassa a borda; sem isso o PNG corta a sombra (e o exportWidth fica curto).
+      const totalW = colX(5) + TREE_CHAMP_W + 26;
 
       // Conectores em cotovelo (filho -> pai) + linha pontilhada final -> campeão.
       let linesSvg = "";
@@ -2432,9 +2435,35 @@
       const restoreInputs = inputsToSpans(document.body);
       const prevScrollY = window.scrollY;
       window.scrollTo(0, 0);
+      let treeRestore = null;
       try {
         await loadHtml2Canvas();
         const SCALE = 2;
+        // A visão em árvore tem scroll horizontal próprio; soltamos o overflow e
+        // fixamos a largura no conteúdo pra que as colunas da direita (final,
+        // campeão) entrem no PNG — senão o html2canvas corta o que está fora.
+        const treeContainer = document.getElementById("bracket-tree");
+        if (treeContainer && !treeContainer.hidden) {
+          const prevOverflow = treeContainer.style.overflow;
+          const prevWidth = treeContainer.style.width;
+          const innerW = treeContainer.firstElementChild
+            ? treeContainer.firstElementChild.offsetWidth : treeContainer.scrollWidth;
+          treeContainer.style.overflow = "visible";
+          treeContainer.style.width = innerW + "px";
+          // O conteúdo fica num <main> com max-width + margin auto. A árvore é mais
+          // larga que ele e transborda; com o html2canvas usando windowWidth maior,
+          // o margin auto recentraliza e empurra a árvore pra fora (corta a direita).
+          // Desligamos max-width/centralização durante a captura.
+          const mainEl = document.querySelector("main");
+          const prevMaxW = mainEl ? mainEl.style.maxWidth : null;
+          const prevMargin = mainEl ? mainEl.style.margin : null;
+          if (mainEl) { mainEl.style.maxWidth = "none"; mainEl.style.margin = "0"; }
+          treeRestore = () => {
+            treeContainer.style.overflow = prevOverflow;
+            treeContainer.style.width = prevWidth;
+            if (mainEl) { mainEl.style.maxWidth = prevMaxW; mainEl.style.margin = prevMargin; }
+          };
+        }
         // Se a visão em círculo estiver ativa e visível, guardamos a posição do
         // .radial-wrap e omitimos o DOM dele no clone do html2canvas; depois
         // desenhamos nosso canvas limpo por cima. Isso evita render duplicado.
@@ -2499,6 +2528,7 @@
       } catch (e) {
         alert("Falha ao gerar PNG: " + e.message);
       } finally {
+        if (treeRestore) treeRestore();
         restoreInputs();
         document.body.style.background = prevBodyBg;
         document.documentElement.style.background = prevHtmlBg;

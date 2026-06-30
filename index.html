@@ -2093,8 +2093,10 @@
         el = inp ? inp.closest(".ko-match") : null;
       }
       if (!el) return;
+      // Limpa destaque de cliques anteriores: só um card fica realçado por vez
+      // (a animação dura ~2.6s, então sem isso vários ficariam acesos juntos).
+      document.querySelectorAll(".jump-flash").forEach((e) => e.classList.remove("jump-flash"));
       el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.remove("jump-flash");
       void el.offsetWidth; // força reinício da animação se já estava destacado
       el.classList.add("jump-flash");
     }

@@ -679,12 +679,7 @@
     <div class="phase-head">
       <h2 class="phase-title">Mata-mata</h2>
       <div class="view-toggle" id="bracket-view-toggle">
-        <button data-view="list" class="active" title="Lista" aria-label="Lista">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-            <line x1="3" y1="4" x2="13" y2="4"/><line x1="3" y1="8" x2="13" y2="8"/><line x1="3" y1="12" x2="13" y2="12"/>
-          </svg>
-        </button>
-        <button data-view="tree" title="Árvore" aria-label="Árvore">
+        <button data-view="tree" class="active" title="Árvore" aria-label="Árvore">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M2 4h3v4h3"/><path d="M2 12h3v-4"/><path d="M8 8h6"/>
           </svg>
@@ -1118,7 +1113,9 @@
 
     // Alternador de visão do mata-mata (lista / árvore / círculo), preferência salva por conta.
     function applyBracketView(v) {
-      const view = (v === "circle" || v === "tree") ? v : "list";
+      // O toggle de lista foi removido; árvore é o padrão. A lógica da lista
+      // continua (renderiza em #bracket, oculto), mas não há mais botão pra ela.
+      const view = v === "circle" ? "circle" : "tree";
       const list = document.getElementById("bracket");
       const tree = document.getElementById("bracket-tree");
       const radial = document.getElementById("bracket-radial");
@@ -2087,7 +2084,12 @@
         el = inp ? inp.closest(".match-row") : null;
       } else if (jump.startsWith("ko:")) {
         const id = jump.slice(3);
-        const inp = document.querySelector(`input[data-ko="${id}"]`);
+        // O card do mata-mata aparece na árvore. Se estiver no círculo (ou em
+        // qualquer outra visão), troca pra árvore antes de rolar/destacar.
+        if (!state.ui || state.ui.bracketView !== "tree") setBracketView("tree");
+        // Lista (oculta) e árvore compartilham data-ko; pega o card visível.
+        const inputs = Array.from(document.querySelectorAll(`input[data-ko="${id}"]`));
+        const inp = inputs.find((x) => x.offsetParent !== null) || inputs[0];
         el = inp ? inp.closest(".ko-match") : null;
       }
       if (!el) return;
@@ -2560,7 +2562,7 @@
         const loadedCollapsed = loaded && loaded.ui && Array.isArray(loaded.ui.collapsed)
           ? loaded.ui.collapsed : [];
         const savedView = loaded && loaded.ui && loaded.ui.bracketView;
-        const loadedView = (savedView === "circle" || savedView === "tree") ? savedView : "list";
+        const loadedView = savedView === "circle" ? "circle" : "tree";
         state = {
           groups: (loaded && loaded.groups) || {},
           ko: (loaded && loaded.ko) || {},

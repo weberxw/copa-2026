@@ -2322,7 +2322,12 @@
         });
         if (radialRect) {
           const circle = await radialToCanvas(radialRect.size, SCALE);
-          canvas.getContext("2d").drawImage(
+          const ctx2 = canvas.getContext("2d");
+          // O html2canvas deixa um scale(devicePixelRatio) na matriz do contexto;
+          // sem resetar, nosso drawImage sairia multiplicado e o círculo iria parar
+          // fora do canvas (sumindo ou cortado). Voltamos pra identidade antes.
+          ctx2.setTransform(1, 0, 0, 1, 0, 0);
+          ctx2.drawImage(
             circle,
             radialRect.x * SCALE,
             radialRect.y * SCALE,
